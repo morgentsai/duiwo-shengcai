@@ -1,20 +1,22 @@
 import { useState } from 'react'
+import { RecurSettings } from '../components/RecurSettings'
 import type { ReactNode } from 'react'
 import type { Account, AccountKind } from '../types'
 import { useStore } from '../store'
 import { fmtTaipei, money, resolvePrefs, uid } from '../logic'
 import { EntryPrefsCard } from '../components/EntryPrefs'
 import { BudgetSettings } from '../components/Budget'
-import { DataCard, DemoCard, SyncCard } from '../components/SettingsCards'
+import { AllocationSettings } from '../components/Allocation'
+import { DataCard, DemoCard, SyncCard, TemplateCard } from '../components/SettingsCards'
 import { AccountEditor } from './Assets'
 import { CatManager } from '../components/CatEditor'
 import { BankBadge } from '../components/ui'
 import { IconChevron, IconChevronL, IconStar } from '../components/icons'
 
 export const APP_VERSION = '3.2.0'
-export type SettingsSub = 'prefs' | 'budget' | 'accounts' | 'cats' | 'sync' | 'data' | 'demo' | 'about'
+export type SettingsSub = 'prefs' | 'budget' | 'accounts' | 'cats' | 'recur' | 'sync' | 'data' | 'demo' | 'about'
 export const SETTINGS_TITLES: Record<SettingsSub, string> = {
-  prefs: '記帳預設值', budget: '每月花費上限', accounts: '帳戶與信用卡', cats: '分類與子分類',
+  prefs: '記帳預設值', budget: '每月花費上限', accounts: '帳戶與信用卡', cats: '分類與子分類', recur: '週期性支出',
   sync: '雲端同步', data: '資料匯入／匯出', demo: '示範資料', about: 'App 資訊',
 }
 const COLORS = ['#0A84FF', '#34C759', '#FF9F0A', '#FF3B30', '#BF5AF2', '#5E5CE6', '#30B0C7', '#A2845E', '#8E8E93']
@@ -32,12 +34,12 @@ function Row({ icon, color, title, detail, onClick, right }: { icon: string; col
 }
 
 export function Settings({ sub, go }: { sub?: SettingsSub; go: (sub?: SettingsSub) => void }) {
-  const { state, hidden, setHidden, syncStatus, expCats } = useStore()
+  const { state, hidden, setHidden, expCats, syncStatus } = useStore()
+  const syncLabel = { off: '未登入', idle: '待同步', syncing: '同步中…', ok: '已同步', error: '同步失敗' }[syncStatus]
   if (sub) return <SubView sub={sub} back={() => go()} />
   const P = resolvePrefs(state)
   const pay = state.accounts.find((a) => a.id === P.payId)?.name ?? '—'
   const limits = Object.values(state.budgets).filter((v) => v > 0).length
-  const syncLabel = { off: '未登入', idle: '待同步', syncing: '同步中…', ok: '已同步', error: '同步失敗' }[syncStatus]
   const cards = state.accounts.filter((a) => a.kind === 'card').length
   return (
     <div className="page settings">
@@ -46,6 +48,7 @@ export function Settings({ sub, go }: { sub?: SettingsSub; go: (sub?: SettingsSu
         <Row icon="✍️" color="#0A84FF" title="記帳預設值" detail={pay} onClick={() => go('prefs')} />
         <Row icon="🎯" color="#34C759" title="每月花費上限" detail={limits ? `${limits} 個分類` : '未設定'} onClick={() => go('budget')} />
         <Row icon="🗂️" color="#FF9F0A" title="分類與子分類" detail={`${expCats.length} 類`} onClick={() => go('cats')} />
+        <Row icon="🔁" color="#FF9F0A" title="週期性支出" detail={`${(state.recurs ?? []).length} 條規則`} onClick={() => go('recur')} />
       </div>
 
       <div className="set-group-h">帳戶</div>
@@ -85,15 +88,18 @@ function SubView({ sub, back }: { sub: SettingsSub; back: () => void }) {
       <button className="set-back" onClick={back}><IconChevronL size={18} /> 設定</button>
       <h2 className="set-sub-title">{SETTINGS_TITLES[sub]}</h2>
       {sub === 'prefs' && <EntryPrefsCard standalone />}
+      {sub === 'recur' && <RecurSettings />}
       {sub === 'budget' && (
         <>
           <BudgetSettings standalone />
+          <AllocationSettings />
           <a className="set-link" href="#analytics">看本月花費進度（分析頁）›</a>
         </>
       )}
       {sub === 'accounts' && <AccountsSettings />}
       {sub === 'cats' && <CatManager />}
       {sub === 'sync' && <SyncCard />}
+      {sub === 'data' && <TemplateCard />}
       {sub === 'data' && <DataCard />}
       {sub === 'demo' && <DemoCard />}
       {sub === 'about' && <About />}
@@ -153,14 +159,13 @@ function AccountsSettings() {
 }
 
 function About() {
-  const { state, syncStatus, lastSynced } = useStore()
+  const { state } = useStore()
   const rows: [string, string][] = [
-    ['App', 'Morgen 的資產與記帳'],
+    ['App', '對我生財'],
     ['版本', `v${APP_VERSION}`],
     ['資料格式', `v${state.version}（舊版資料會自動升級）`],
     ['資料筆數', `${state.accounts.length} 個帳戶・${state.txs.length} 筆紀錄・${state.holdings.length} 檔持倉`],
     ['本機最後修改', `${fmtTaipei(state.updatedAt)}（台北時間）`],
-    ['雲端同步', syncStatus === 'off' ? '未登入（只存在這台裝置）' : `已登入${lastSynced ? `・最後同步 ${fmtTaipei(lastSynced)}` : ''}`],
     ['時區', 'Asia/Taipei（UTC+8）'],
   ]
   return (
@@ -170,7 +175,7 @@ function About() {
           <div key={k} className="set-row"><span className="set-title">{k}</span><span className="set-detail wrap">{v}</span></div>
         ))}
       </div>
-      <p className="set-foot">隱私：所有資料存在你的裝置；登入 Google 後，資料加密傳輸並存放在 Supabase，只有你的帳號能讀寫。公開網站只內建示範資料。</p>
+      <p className="set-foot">隱私：所有資料只存在你這台裝置的瀏覽器，不會上傳到任何伺服器。</p>
     </>
   )
 }

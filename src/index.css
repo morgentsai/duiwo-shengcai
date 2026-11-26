@@ -552,3 +552,13 @@ button.set-row:active { background: #f2f2f7; }
 .del-panel select { width: 100%; }
 .inline-add input:focus, .del-panel select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px #0a84ff22; }
 .cat-row .set-icon.plain { font-size: 20px; }
+
+/* ---------- 撲滿／結餘／50-30-20 ---------- */
+.surplus-act { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.surplus-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.win { color: var(--green-t); font-weight: 600; margin-top: 8px; }
+.jar { padding: 12px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.jar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.jar-log { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.rule-row { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
+.form-stack { display: flex; flex-direction: column; gap: 12px; }

@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Account, AppState, BudgetCfg, EntryPrefs, Grp, Holding, Tx } from './types'
+import type { Account, AppState, BudgetCfg, EntryPrefs, Grp, Holding, JarEntry, Recur, Tx } from './types'
 import { setCustomCats, visibleCats } from './types'
 import { addCat as addCatOp, addSub as addSubOp, catsOf, deleteCat, deleteSub } from './catops'
 import type { OpResult } from './catops'
-import { applyFull, migrate, thisMonth, todayStr, uid, upsertSnapshot, validState } from './logic'
+import { applyFull, dueRecurDates, migrate, thisMonth, todayStr, uid, upsertSnapshot, validState } from './logic'
 export { validState }
 import { buildDemo, clearData } from './demo'
 import { supabase } from './supabase'
@@ -12,9 +12,8 @@ import { supabase } from './supabase'
 const LS_KEY = 'morgen-wealth-v3'
 /** 舊版 localStorage 鍵，依新到舊嘗試升級 */
 const LEGACY_KEYS = ['morgen-wealth-v2', 'morgen-wealth-v1']
-/** 記錄此裝置已與哪個 Google 帳號（user id）連結過，避免每次都詢問 */
-const LS_LINKED = 'morgen-wealth-linked-user'
 const LS_HIDE = 'morgen-wealth-hide'
+const LS_LINKED = 'morgen-wealth-linked-user'
 const LS_SYNCED = 'morgen-wealth-last-synced'
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'ok' | 'error'
@@ -65,15 +64,16 @@ async function putRemote(s: AppState): Promise<{ conflict: boolean; state?: AppS
   return { conflict: false }
 }
 
+
 function useStoreValue() {
   const [state, setState] = useState<AppState>(loadInitial)
   const [hidden, setHidden] = useState(() => localStorage.getItem(LS_HIDE) === '1')
+  const [toast, setToast] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
   const [userEmail, setUserEmail] = useState<string>('')
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('off')
   const [syncError, setSyncError] = useState('')
   const [lastSynced, setLastSynced] = useState<number>(() => Number(localStorage.getItem(LS_SYNCED) || 0))
-  const [toast, setToast] = useState<string>('')
   const syncedVersion = useRef<number>(0)
   const stateRef = useRef(state)
   stateRef.current = state
@@ -301,7 +301,70 @@ function useStoreValue() {
   const loadDemo = useCallback(() => commit((s) => ({ ...buildDemo(), ...(s.prefs ? { prefs: s.prefs } : {}) })), [commit])
   const importState = useCallback((s: AppState) => commit(() => adopt(s)), [commit])
 
-  // ---------- 雲端同步 ----------
+  // ---------- 撲滿 ----------
+  const addJar = useCallback(
+    (j: { name: string; emoji: string; target?: number }) =>
+      commit((s) => ({ ...s, jars: [...(s.jars ?? []), { id: uid(), name: j.name, emoji: j.emoji || '🐷', target: j.target && j.target > 0 ? j.target : undefined, balance: 0 }] })),
+    [commit],
+  )
+  const deleteJar = useCallback(
+    (id: string) => commit((s) => ({ ...s, jars: (s.jars ?? []).filter((j) => j.id !== id), jarLog: (s.jarLog ?? []).filter((e) => e.jarId !== id) })),
+    [commit],
+  )
+  /** delta > 0 存入、< 0 取出；不會低於 0 */
+  const moveJar = useCallback(
+    (jarId: string, delta: number, date: string, note: string, key?: string) =>
+      commit((s) => {
+        const jar = (s.jars ?? []).find((j) => j.id === jarId)
+        if (!jar || !delta) return s
+        const amount = Math.max(-jar.balance, delta)
+        const entry: JarEntry = { id: uid(), jarId, amount, date, note, ...(key ? { key } : {}) }
+        return {
+          ...s,
+          jars: (s.jars ?? []).map((j) => (j.id === jarId ? { ...j, balance: j.balance + amount } : j)),
+          jarLog: [entry, ...(s.jarLog ?? [])],
+        }
+      }),
+    [commit],
+  )
+
+  const addRecur = useCallback(
+    (r: Omit<Recur, 'id'>) => commit((s) => ({ ...s, recurs: [...(s.recurs ?? []), { ...r, id: uid() }] })),
+    [commit],
+  )
+  const removeRecur = useCallback(
+    (id: string) => commit((s) => ({ ...s, recurs: (s.recurs ?? []).filter((r) => r.id !== id) })),
+    [commit],
+  )
+  /** 依規則補記截至今天的發生日，一次 commit 完成（含更新 lastRun），避免重複入帳 */
+  const runRecur = useCallback(
+    () =>
+      commit((s) => {
+        const rules = s.recurs ?? []
+        if (!rules.length) return s
+        const today = todayStr()
+        let cur = s
+        const fresh: Tx[] = []
+        const nextRules = rules.map((r) => {
+          const dates = dueRecurDates(r, today)
+          if (!dates.length) return r
+          for (const d of dates) {
+            const tx: Tx = { ...r.tpl, id: uid(), date: d, type: 'expense' }
+            if (!(tx.amount > 0)) continue
+            const res = applyFull(cur, tx, 1)
+            cur = res.state
+            fresh.push(res.tx)
+          }
+          return { ...r, lastRun: dates[dates.length - 1] }
+        })
+        if (fresh.length === 0 && nextRules.every((r, i) => r === rules[i])) return s
+        return { ...cur, recurs: nextRules, txs: [...fresh.reverse(), ...s.txs] }
+      }),
+    [commit],
+  )
+  useEffect(() => { runRecur() }, [runRecur])
+
+  // ---------- 雲端同步（Supabase + Google 登入） ----------
   const pull = useCallback(async () => {
     const r = await fetchRemote()
     if (r && validState(r.state) && r.updatedAt > stateRef.current.updatedAt) {
@@ -458,7 +521,8 @@ function useStoreValue() {
     state, hidden, setHidden, toast, flash,
     addTx, updateTx, deleteTx, runFlow, resetFlow,
     upsertAccount, deleteAccount, cardStatement, upsertHolding, deleteHolding, setBudget, setBudgetCfg, setGroup, setPrefs, addCustomCat, addCustomSub, removeCustomCat, removeCustomSub, expCats, pickCats, catOp, catEdit,
-    clearDemo, loadDemo, importState, importTxs, addTxs, deleteGroup, autopay, collect,
+    clearDemo, loadDemo, importState, importTxs, addTxs, deleteGroup, autopay, collect, addJar, deleteJar, moveJar,
+    addRecur, removeRecur, runRecur,
     userEmail, syncStatus, syncError, lastSynced, signIn, signOut, syncNow,
   }
 }

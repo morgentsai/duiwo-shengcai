@@ -8,7 +8,11 @@ import { Analytics } from './pages/Analytics'
 import { SETTINGS_TITLES, Settings } from './pages/Settings'
 import type { SettingsSub } from './pages/Settings'
 import { TxEditor } from './components/TxEditor'
-import { IconChart, IconCloud, IconEye, IconEyeOff, IconGear, IconHome, IconList, IconPlus, IconWallet } from './components/icons'
+import { BurstLayer } from './components/Burst'
+import { IconChart, IconEye, IconEyeOff, IconGear, IconHome, IconList, IconPlus, IconWallet } from './components/icons'
+
+/** 目前登入的帳號身分（顯示在上方） */
+const ACCOUNT_NAME = 'Morgen'
 
 type Tab = 'home' | 'tx' | 'assets' | 'analytics' | 'settings'
 const TITLES: Record<Tab, string> = { home: '總覽', tx: '記帳明細', assets: '資產與負債', analytics: '分析', settings: '設定' }
@@ -20,7 +24,7 @@ function parseHash(): { tab: Tab; sub?: SettingsSub } {
 }
 
 function Shell() {
-  const { state, hidden, setHidden, toast, clearDemo, flash, syncStatus } = useStore()
+  const { state, hidden, setHidden, toast, clearDemo, flash } = useStore()
   const [tab, setTab] = useState<Tab>(() => parseHash().tab)
   const [sub, setSub] = useState<SettingsSub | undefined>(() => parseHash().sub)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -37,6 +41,19 @@ function Shell() {
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+  /** #new 直接開啟快速記帳（給 PWA 捷徑用），開啟後把網址改回 #home */
+  useEffect(() => {
+    const openIfNew = () => {
+      if (location.hash !== '#new') return
+      setEditing(undefined)
+      setNewDate(undefined)
+      setEditorOpen(true)
+      history.replaceState(null, '', '#home')
+    }
+    openIfNew()
+    window.addEventListener('hashchange', openIfNew)
+    return () => window.removeEventListener('hashchange', openIfNew)
   }, [])
   useEffect(() => {
     const want = `#${tab}${tab === 'settings' && sub ? `/${sub}` : ''}`
@@ -67,15 +84,11 @@ function Shell() {
       <header className="topbar">
         <div className="topbar-inner">
           <div>
-            <div className="brand">Morgen 的資產</div>
+            <div className="brand">對我生財</div>
             <h1>{TITLES[tab]}</h1>
           </div>
           <div className="top-actions">
-            {syncStatus !== 'off' && (
-              <button className={`icon-btn sync-dot ${syncStatus}`} onClick={() => goSettings('sync')} aria-label="雲端同步狀態" title="雲端同步">
-                <IconCloud />
-              </button>
-            )}
+            <span className="who" title="目前登入的帳號">🌸 {ACCOUNT_NAME}</span>
             <button className="icon-btn" onClick={() => setHidden(!hidden)} aria-label={hidden ? '顯示金額' : '隱藏金額'} title={hidden ? '顯示金額' : '隱藏金額'}>
               {hidden ? <IconEyeOff /> : <IconEye />}
             </button>
@@ -91,7 +104,7 @@ function Shell() {
           <span>👀 目前為<b>示範資料</b>，可隨意點按測試</span>
           <button
             onClick={() => {
-              if (window.confirm('一鍵清空示範資料？\n\n會保留 8 個銀行帳戶、現金錢包、3 個證券戶與 5 張信用卡的設定，只把餘額與明細歸零。')) {
+              {
                 clearDemo()
                 flash('已清空，開始正式記帳吧！')
               }
@@ -130,6 +143,7 @@ function Shell() {
 
       <TxEditor open={editorOpen} onClose={closeTx} editing={editing} initialDate={newDate} />
       {toast && <div className="toast" role="status">{toast}</div>}
+      <BurstLayer />
     </div>
   )
 }

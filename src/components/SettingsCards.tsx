@@ -4,7 +4,76 @@ import { convertAndroMoney, readCsvFile } from '../andromoney'
 import { resolveAlias } from '../catops'
 import { useStore, validState } from '../store'
 import { fmtTaipei, todayStr } from '../logic'
+import { buildExportCsv, buildTemplateCsv, parseTemplate, type TemplateRow } from '../csvTemplate'
 import { IconCloud } from './icons'
+
+function downloadText(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 記帳模板：下載空白模板、匯入（逐列檢查）、匯出既有紀錄 */
+export function TemplateCard() {
+  const { state, expCats, addTxs, flash } = useStore()
+  const ref = useRef<HTMLInputElement>(null)
+  const [pv, setPv] = useState<{ name: string; header: string | null; rows: TemplateRow[] } | null>(null)
+  const valid = pv ? pv.rows.filter((r) => r.tx).map((r) => r.tx as Omit<Tx, 'id'>) : []
+  const errors = pv ? pv.rows.filter((r) => r.error) : []
+  const onFile = async (f?: File) => {
+    if (!f) return
+    try {
+      const text = await readCsvFile(f)
+      const r = parseTemplate(text, state, expCats)
+      setPv({ name: f.name, header: r.header, rows: r.rows })
+    } catch {
+      flash('讀取檔案失敗')
+    }
+    if (ref.current) ref.current.value = ''
+  }
+  const doImport = () => {
+    if (!valid.length) return
+    addTxs(valid)
+    flash(`已匯入 ${valid.length} 筆紀錄`)
+    setPv(null)
+  }
+  return (
+    <section className="card">
+      <p className="muted small">一次輸入很多筆時，先下載模板，在 Excel 或 Google 試算表填好後存成 CSV 再匯入。日期 2026-11-25、類型填「支出／收入／轉帳」，帳戶與分類請用 App 裡的名稱。錯誤的列會標出行號，正確的列才會匯入。</p>
+      <div className="list-actions">
+        <button className="btn small ghost" onClick={() => downloadText('morgen-記帳模板.csv', buildTemplateCsv(state))}>下載記帳模板</button>
+        <button className="btn small ghost" onClick={() => ref.current?.click()}>匯入記帳 CSV</button>
+        <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+        <button className="btn small ghost" onClick={() => downloadText(`morgen-記帳匯出-${todayStr()}.csv`, buildExportCsv(state))}>匯出記帳 CSV</button>
+      </div>
+      {pv && (
+        <div className="import-preview">
+          <div className="strong">「{pv.name}」</div>
+          {pv.header ? (
+            <div className="small warn">{pv.header}</div>
+          ) : (
+            <>
+              <div className="small">可匯入 <b>{valid.length}</b> 筆，<b>{errors.length}</b> 列有問題</div>
+              {errors.length > 0 && (
+                <ul className="small warn" style={{ margin: '4px 0', paddingLeft: 18 }}>
+                  {errors.slice(0, 12).map((r) => <li key={r.line}>第 {r.line} 列：{r.error}</li>)}
+                  {errors.length > 12 && <li>…還有 {errors.length - 12} 列</li>}
+                </ul>
+              )}
+            </>
+          )}
+          <div className="list-actions" style={{ padding: 0 }}>
+            <button className="btn small ghost" onClick={() => setPv(null)}>取消</button>
+            <button className="btn small primary" disabled={!valid.length} onClick={doImport}>匯入 {valid.length} 筆</button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
 
 export function SyncCard() {
   const { userEmail, syncStatus, syncError, lastSynced, signIn, signOut, syncNow } = useStore()
@@ -76,7 +145,7 @@ export function DataCard() {
     try {
       const data = JSON.parse(await f.text())
       if (!validState(data)) throw new Error('格式不符')
-      if (window.confirm(`匯入「${f.name}」會覆蓋目前所有資料，確定嗎？`)) {
+      {
         importState(data)
         flash('已匯入備份')
       }
@@ -126,7 +195,7 @@ export function DemoCard() {
       <div className="list-actions">
         <button
           className="btn small ghost danger"
-          onClick={() => window.confirm('清空所有餘額與明細，只保留帳戶、信用卡與證券戶結構？') && (clearDemo(), flash('已清空，可以開始正式記帳'))}
+          onClick={() => (clearDemo(), flash('已清空，可以開始正式記帳'))}
         >
           清空示範資料
         </button>

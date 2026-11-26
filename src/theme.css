@@ -1,0 +1,309 @@
+/* ==========================================================
+   整體改版：奶油白底、襯線標題、粉金點綴、桌機左側導覽列
+   只覆寫外觀與排版，不改元件結構
+   ========================================================== */
+
+:root {
+  --bg: #f7f3ec;
+  --card: #fffdf9;
+  --line: #e9e1d4;
+  --text: #2f2a25;
+  --sub: #7b7164;
+  --faint: #a39a8e;
+  --blue: #a9755a;          /* 主要按鈕／強調：柔和的焦糖玫瑰 */
+  --green: #7fa886;
+  --green-t: #4f7a59;
+  --orange: #d9a46c;
+  --orange-t: #9c6a35;
+  --red: #c98a7e;
+  --red-t: #a65c50;
+  --serif: 'Noto Serif TC', 'Songti TC', 'PMingLiU', 'Times New Roman', serif;
+  --radius: 20px;
+  --tabbar-h: 66px;
+  font-family: 'Noto Sans TC', 'PingFang TC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Microsoft JhengHei', sans-serif;
+  background: var(--bg);
+}
+html, body { background: var(--bg); }
+
+/* ---------- 標題與頂列 ---------- */
+.topbar { background: rgba(247, 243, 236, 0.86); }
+.brand { font-family: var(--serif); font-size: 12.5px; color: var(--faint); letter-spacing: 0.14em; }
+.topbar h1, h1, h2, h3 { font-family: var(--serif); letter-spacing: 0.01em; }
+.topbar h1 { font-size: 28px; font-weight: 600; }
+.card h2 { font-size: 17px; font-weight: 600; }
+.top-actions .icon-btn { background: var(--card); border: 1px solid var(--line); color: var(--sub); }
+.icon-btn:hover { background: #efe8dc; }
+.demo-bar { background: #fbf1e1; border-color: #efdcb8; color: #7a5a2c; border-radius: 14px; }
+.demo-bar button { background: var(--orange-t); }
+
+/* ---------- 卡片 ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; }
+.card.alert { background: #fbf4ea; border-color: #ecd6b6; }
+.hero { background: linear-gradient(160deg, #fffdf9 0%, #f8efe6 100%); }
+.hero-num { font-family: var(--serif); font-weight: 600; }
+.set-group { background: var(--card); border: 1px solid var(--line); }
+.set-group-h { font-family: var(--serif); color: var(--sub); text-transform: none; font-size: 14px; letter-spacing: 0.04em; }
+.progress { background: #efe7da; }
+.empty { color: var(--faint); }
+.pill.green { background: #e7efe6; color: var(--green-t); }
+.pill.orange { background: #f8ecdc; color: var(--orange-t); }
+.pill.red { background: #f5e4e0; color: var(--red-t); }
+.win { color: var(--green-t); }
+
+/* 粉金小點綴：卡片標題前的細線 */
+.card h2::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: linear-gradient(#d9b8a6, #c79a6e); flex: none; }
+.card h2:has(> .dot)::before, .card h2:empty::before { content: none; }
+
+/* ---------- 按鈕 ---------- */
+.btn.primary { background: var(--blue); box-shadow: 0 4px 14px rgba(169, 117, 90, 0.22); }
+.btn.ghost { background: #f1ebe0; color: var(--text); }
+.btn.primary:active:not(:disabled) { background: #976649; }
+.btn { border-radius: 14px; }
+
+/* ---------- 底部導覽（手機）---------- */
+.tabbar { background: rgba(255, 253, 249, 0.92); border-top: 1px solid var(--line); }
+.tabbar > button.on { color: var(--text); }
+.tabbar > button.on span { font-weight: 600; }
+.fab { background: var(--blue); box-shadow: 0 8px 20px rgba(169, 117, 90, 0.3), 0 0 0 5px var(--bg); }
+
+/* ---------- 排版：手機單欄，平板以上雙欄 ---------- */
+.page { display: flex; flex-direction: column; gap: 16px; }
+.main { padding-top: 14px; }
+
+@media (min-width: 820px) {
+  .main { padding: 18px 36px 0; }
+  .topbar-inner { padding: 26px 36px 14px; }
+  .demo-bar { margin: 4px 36px 0; }
+  .page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+  .page > * { grid-column: 1 / -1; }
+  .page > .half { grid-column: span 1; }
+  .page > .card.wide { grid-column: 1 / -1; }
+}
+
+/* ---------- 桌機：左側導覽列 ---------- */
+@media (min-width: 1000px) {
+  .app { max-width: 1240px; margin: 0 0 0 232px; padding-bottom: 40px; }
+  .tabbar {
+    left: 0; right: auto; top: 0; bottom: 0; transform: none; width: 232px; height: 100dvh;
+    display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+    padding: 30px 16px; border: 0; border-right: 1px solid var(--line); border-radius: 0;
+    background: var(--card); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  .tabbar > button:not(.fab) {
+    flex-direction: row; justify-content: flex-start; gap: 12px; height: 44px; padding: 0 14px;
+    border-radius: 12px; font-size: 14.5px; color: var(--sub);
+  }
+  .tabbar > button:not(.fab):hover { background: #f4eee4; }
+  .tabbar > button.on { background: #f3e9dc; color: var(--text); }
+  .tabbar > button:not(.fab) svg { width: 20px; height: 20px; }
+  .fab {
+    order: -1; width: 100%; height: 46px; border-radius: 14px; transform: none; margin-bottom: 18px;
+    display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 16px rgba(169, 117, 90, 0.25);
+  }
+  .fab:active { transform: scale(0.98); }
+  .fab::after { content: '新增一筆'; font-size: 14.5px; font-weight: 600; }
+  .toast { bottom: 28px; }
+  .sheet-backdrop { left: 232px; }
+}
+
+/* ---------- 精簡列（總覽的本月結餘）、設定頁小元件 ---------- */
+.card.slim { padding: 12px 16px; }
+.slim-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }
+.alloc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+
+/* ---------- 總覽：可收合的發薪日流程、合併的本月概況 ---------- */
+.fold-head { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; text-align: left; }
+.fold-head h2 { margin-bottom: 2px; }
+.chev { color: var(--faint); display: grid; place-items: center; transition: transform 0.2s; }
+.chev.open { transform: rotate(180deg); }
+.flow-tools { display: flex; justify-content: flex-end; margin-top: 8px; }
+.month-cash { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+
+/* ==========================================================
+   金光版：奶油白＋粉金漸層，主要數字與按鈕帶微光
+   ========================================================== */
+:root {
+  --gold-1: #f3e2bf;
+  --gold-2: #dcb676;
+  --gold-3: #b5843f;
+  --gold-ink: #6e4f22;
+  --blue: #b08544;              /* 主要按鈕與強調：深一點的金 */
+  --line: #eadcc4;
+  --bg: #f8f3e9;
+}
+body {
+  background-color: var(--bg);
+  /* 極淡的金色星點，像灑了一點金粉 */
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(220, 182, 118, 0.10) 0, transparent 40%),
+    radial-gradient(circle at 92% 30%, rgba(243, 226, 191, 0.55) 0, transparent 38%),
+    radial-gradient(rgba(201, 160, 106, 0.16) 1px, transparent 1.4px);
+  background-size: auto, auto, 26px 26px;
+  background-attachment: fixed;
+}
+html { background: var(--bg); }
+
+/* 品牌與標題：金色細字 */
+.brand { color: var(--gold-3); letter-spacing: 0.22em; }
+.brand::before { content: '✦ '; }
+.topbar h1 {
+  background: linear-gradient(100deg, #6e4f22 0%, #b5843f 45%, #e7c98f 60%, #8f6a33 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  background-size: 220% 100%; animation: goldShimmer 9s ease-in-out infinite;
+}
+
+/* 卡片：金色細邊、淡淡的內光 */
+.card {
+  border: 1px solid rgba(201, 160, 106, 0.35);
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgba(255, 244, 220, 0.55) 0%, transparent 60%),
+    var(--card);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 12px 28px -18px rgba(176, 133, 68, 0.35);
+}
+.card h2::before { background: linear-gradient(#f0d89f, #b5843f); box-shadow: 0 0 8px rgba(220, 182, 118, 0.6); }
+
+/* 總淨資產：金光主角 */
+.hero {
+  background:
+    radial-gradient(90% 70% at 88% 0%, rgba(255, 236, 196, 0.9) 0%, transparent 60%),
+    radial-gradient(60% 50% at 0% 100%, rgba(243, 226, 191, 0.5) 0%, transparent 70%),
+    linear-gradient(160deg, #fffdf7 0%, #f6ead6 100%);
+  border-color: rgba(201, 160, 106, 0.55);
+  box-shadow: 0 18px 40px -20px rgba(176, 133, 68, 0.45);
+}
+.hero-label::before { content: '✦ '; color: var(--gold-2); }
+.hero-num {
+  background: linear-gradient(110deg, #8f6a33 0%, #d9b06a 30%, #fff3d8 48%, #d9b06a 62%, #8f6a33 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: goldShimmer 7s ease-in-out infinite;
+  filter: drop-shadow(0 2px 10px rgba(220, 182, 118, 0.35));
+}
+.hero-split button { border-left-color: rgba(201, 160, 106, 0.35); }
+
+/* 金色進度條與提示 */
+.progress { background: #f1e6d2; }
+.progress-fill.blue, .progress-fill.green {
+  background: linear-gradient(90deg, #e9cd92, #c08f55 70%, #e3bd7c);
+  box-shadow: 0 0 10px rgba(220, 182, 118, 0.45);
+}
+.pill.green { background: #f4ead2; color: var(--gold-ink); }
+.pill.orange { background: #fbeedd; color: #8f5f26; }
+.win { color: var(--gold-ink); }
+.win::before { content: '✦ '; color: var(--gold-2); }
+
+/* 按鈕：金箔漸層 */
+.btn.primary {
+  background: linear-gradient(135deg, #d8b071 0%, #b5843f 55%, #c99a58 100%);
+  box-shadow: 0 6px 18px -6px rgba(176, 133, 68, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  color: #fffdf7;
+  letter-spacing: 0.02em;
+}
+.btn.primary:active:not(:disabled) { background: linear-gradient(135deg, #c79f5e, #9b7032); }
+.btn.ghost { background: #f5ecdb; color: var(--gold-ink); }
+.tabbar > button.on { color: var(--gold-3); }
+.tabbar > button.on span { color: var(--gold-ink); }
+
+/* 導覽與 FAB：金色光暈 */
+.fab {
+  background: linear-gradient(135deg, #e2bd7d 0%, #b5843f 100%);
+  box-shadow: 0 10px 26px -6px rgba(176, 133, 68, 0.6), 0 0 0 5px var(--bg);
+}
+.fab::after { color: #fffdf7; }
+@media (min-width: 1000px) {
+  .tabbar { background: linear-gradient(180deg, #fffdf8 0%, #f9f2e4 100%); border-right-color: rgba(201, 160, 106, 0.35); }
+  .tabbar > button.on { background: linear-gradient(90deg, #f6e9cf, #fbf4e6); color: var(--gold-ink); box-shadow: inset 2px 0 0 #c99a58; }
+  .fab { box-shadow: 0 8px 22px -6px rgba(176, 133, 68, 0.65); }
+  .fab::after { content: '新增一筆'; }
+}
+
+/* 撲滿：小金罐的感覺 */
+.jar { border-top-color: rgba(201, 160, 106, 0.35); }
+.jar .strong { letter-spacing: 0.01em; }
+.surplus-form select, .field select, .field input { border-color: #eadcc4; }
+.field input:focus, .field select:focus { border-color: #c99a58; box-shadow: 0 0 0 3px rgba(201, 160, 106, 0.2); }
+
+/* 動畫 */
+@keyframes goldShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-num, .topbar h1 { animation: none; }
+}
+
+/* 資產頁頂部：淨資產下方的四個組成 */
+.asset-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; border-top: 1px solid rgba(201, 160, 106, 0.35); padding-top: 12px; margin-top: 6px; }
+.asset-split > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.asset-split .k { font-size: 12px; color: var(--sub); }
+@media (min-width: 820px) { .asset-split { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ---------- 記帳表單：收合列，手機鍵盤不遮住主要欄位 ---------- */
+.row-pick { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: #fbf8f2; font-size: 15px; text-align: left; color: var(--text); }
+.row-pick-val { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev-r { color: var(--faint); font-size: 16px; }
+.sheet-body .amount-input { padding: 2px 4px 2px; }
+.sheet-body .amount-input input { font-size: 36px; }
+.sheet-body .section-label { margin-top: 0; }
+
+/* 日期前後一天 */
+.date-step { display: flex; align-items: center; gap: 6px; }
+.date-step input { flex: 1; min-width: 0; }
+.date-step .small { white-space: nowrap; }
+.recur-row { gap: 10px; }
+.recur-row .set-title { flex: 1; min-width: 0; }
+
+/* 已實現損益 */
+.realized-box { grid-column: 1 / -1; border-top: 1px solid var(--line, #eee); padding-top: 10px; display: grid; gap: 8px; }
+.realized-h { display: flex; justify-content: space-between; align-items: baseline; }
+.realized-rows { display: grid; gap: 4px; }
+.realized-rows > div { display: flex; justify-content: space-between; }
+.realized-years { display: grid; gap: 4px; }
+.realized-row-h { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: right; }
+.realized-row-h > span:first-child { text-align: left; }
+.strat-row { margin-top: 8px; }
+
+/* 月底小撲滿提醒（互動） */
+.piggy-wrap { display: grid; gap: 12px; }
+.piggy-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.piggy-stats > div { background: var(--cream, #FBF7F0); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+.piggy-stage { position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 0 4px; min-height: 150px; }
+.piggy { font-size: 84px; line-height: 1; background: none; border: 0; cursor: pointer; transition: transform .15s; -webkit-tap-highlight-color: transparent; }
+.piggy:active { transform: scale(.92); }
+.piggy.bump-0 { animation: piggy-bump .4s; }
+.piggy.bump-1 { animation: piggy-bump-b .4s; }
+@keyframes piggy-bump { 0% { transform: scale(1); } 40% { transform: scale(1.18) rotate(-6deg); } 100% { transform: scale(1); } }
+@keyframes piggy-bump-b { 0% { transform: scale(1); } 40% { transform: scale(1.18) rotate(6deg); } 100% { transform: scale(1); } }
+.coin-fly { position: absolute; top: 10px; left: 50%; font-size: 26px; pointer-events: none; animation: coin-fall .9s ease-in forwards; }
+@keyframes coin-fall { from { transform: translate(-50%, -10px) rotate(0); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), 90px) rotate(360deg); opacity: 0; } }
+.piggy-wrap input[type=range] { width: 100%; accent-color: #C9A227; }
+.piggy-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.piggy-jars { display: grid; gap: 6px; justify-items: center; }
+.piggy-done { text-align: center; display: grid; gap: 8px; padding: 12px 0; position: relative; }
+.confetti { display: flex; justify-content: center; gap: 6px; font-size: 30px; }
+.confetti span { display: inline-block; animation: pop-in .6s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes pop-in { from { transform: scale(0) translateY(10px); } to { transform: scale(1) translateY(0); } }
+
+/* 分類排行：支出／收入區塊 */
+.rank-block { display: grid; gap: 8px; margin-top: 14px; }
+.rank-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* 記帳情緒動畫：支出感謝、收入豐盛、轉帳希望 */
+.burst-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 300; }
+.burst-p { position: absolute; left: var(--x); top: 0; font-size: var(--s); opacity: 0; will-change: transform, opacity; animation-duration: var(--d); animation-delay: var(--delay); animation-fill-mode: both; animation-timing-function: ease-out; }
+.burst-p.rise { top: auto; bottom: -40px; animation-name: burst-rise; }
+.burst-p.fall { top: -40px; animation-name: burst-fall; }
+.burst-p.drift { top: auto; bottom: -30px; animation-name: burst-drift; }
+@keyframes burst-rise { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--sway), -95vh) scale(1.15); opacity: 0; } }
+@keyframes burst-fall { 0% { transform: translate(0, 0) rotate(0); opacity: 0; } 8% { opacity: 1; } 100% { transform: translate(var(--sway), 105vh) rotate(300deg); opacity: .95; } }
+@keyframes burst-drift { 0% { transform: translate(0, 0) scale(.4); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(calc(var(--sway) * 2), -70vh) scale(1.05); opacity: 0; } }
+.burst-banner { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 301; pointer-events: none; background: rgba(255, 252, 245, .94); color: #5B4A2E; padding: 10px 18px; border-radius: 999px; box-shadow: 0 8px 28px rgba(201, 162, 39, .28); font-weight: 600; font-size: 15px; white-space: nowrap; animation: burst-banner 2s ease both; }
+@keyframes burst-banner { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* 收入：金色光暈 */
+.burst-p.gold { filter: drop-shadow(0 0 6px rgba(212, 175, 55, .9)) drop-shadow(0 0 14px rgba(255, 215, 0, .45)); }
+.burst-banner.gold, .burst-banner { border: 1px solid rgba(212, 175, 55, .35); }
+
+/* 上方品牌列：App 名稱與登入帳號身分 */
+.brand-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.who { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); color: var(--sub); }
+.top-actions .who { align-self: center; height: 30px; display: inline-flex; align-items: center; }

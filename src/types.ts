@@ -78,6 +78,8 @@ export interface Trade {
   fee: number
   /** 賣出當下的平均成本（用於回補） */
   costAtSell?: number
+  /** 投資策略：定期定額（長期）／波段（短線）；沒標記的歸入「未標記」 */
+  strategy?: 'dca' | 'swing'
 }
 
 export interface Receivable {
@@ -107,6 +109,19 @@ export interface Holding {
   price: number // 現價
 }
 
+/** 週期性支出規則：依頻率自動入帳（每次開啟 App 時補記到今天） */
+export type RecurFreq = 'week' | 'month' | 'year'
+export interface Recur {
+  id: string
+  freq: RecurFreq
+  /** 第一次發生的日期；之後每週／每月同一日／每年同一日 */
+  start: string
+  /** 最後一次已入帳的日期，避免重複 */
+  lastRun?: string
+  /** 入帳範本（不含 id 與日期） */
+  tpl: Omit<Tx, 'id' | 'date'>
+}
+
 export interface AppState {
   version: 2
   isDemo: boolean
@@ -124,6 +139,8 @@ export interface AppState {
   /** 分類資料版本：2＝已是 10 分類，之後不再套用舊名稱對照 */
   catVer?: number
   receivables: Receivable[]
+  /** 週期性支出規則（選填） */
+  recurs?: Recur[]
   invSnapshots: InvSnapshot[]
   /** 記帳預設值（選填；舊資料沒有時一律用預設） */
   prefs?: Partial<EntryPrefs>
@@ -131,7 +148,30 @@ export interface AppState {
   budgetCfg?: BudgetCfg
   /** 三大類：子分類（`分類|子分類`）或整個分類（`分類|*`）歸到固定／變動支出；沒設定的用預設 */
   groupMap?: Record<string, Grp>
+  /** 撲滿：預留給某個目標（旅遊、想買的東西）的錢，仍在原帳戶內 */
+  jars?: Jar[]
+  /** 撲滿異動紀錄（存入為正、取出為負） */
+  jarLog?: JarEntry[]
   updatedAt: number
+}
+
+export interface Jar {
+  id: string
+  name: string
+  emoji: string
+  /** 目標金額（選填） */
+  target?: number
+  balance: number
+}
+
+export interface JarEntry {
+  id: string
+  jarId: string
+  amount: number
+  date: string
+  note: string
+  /** 同一來源只會存入一次（例如 surplus-2026-11） */
+  key?: string
 }
 
 export interface BudgetCfg {
@@ -145,6 +185,8 @@ export interface BudgetCfg {
   groups?: { fixed?: number; variable?: number; saving?: number }
   /** 每月收入估計（未設＝近 3 個月平均薪資） */
   incomeEst?: number
+  /** 收入分配比例（%）：必要／想要／未來目標，合計 100 */
+  ratio?: { needs: number; wants: number; savings: number }
 }
 
 export type Grp = 'fixed' | 'variable'

@@ -8,6 +8,8 @@ import type { TradeKind } from '../components/Invest'
 import { InvestChart } from '../components/charts'
 import { BankBadge, Field, Money, Progress, Segmented, Sheet } from '../components/ui'
 import { IconChevron, IconStar } from '../components/icons'
+import { JarsCard } from '../components/Jars'
+import { OwedCard } from '../components/Collect'
 
 type Sec = 'bank' | 'card' | 'invest'
 const COLORS = ['#0A84FF', '#34C759', '#FF9F0A', '#FF3B30', '#BF5AF2', '#5E5CE6', '#30B0C7', '#A2845E', '#8E8E93']
@@ -45,11 +47,20 @@ export function Assets() {
 
   return (
     <div className="page">
-      <section className="card summary-strip">
-        <div><span className="muted small">銀行與現金</span><Money v={T.liquid} className="strong" /></div>
-        <div><span className="muted small">投資市值</span><Money v={T.invest} className="strong pos" /></div>
-        <div><span className="muted small">信用卡與負債</span><Money v={-T.debt} className="strong neg" /></div>
+      {/* 一進來就看到總淨資產與各項組成 */}
+      <section className="card hero">
+        <div className="hero-label">總淨資產</div>
+        <Money v={T.net} className="hero-num" />
+        <div className="asset-split">
+          <div><span className="k">銀行與現金</span><Money v={T.liquid} /></div>
+          <div><span className="k">投資市值</span><Money v={T.invest} /></div>
+          <div><span className="k">待收代墊</span><Money v={T.receivable} /></div>
+          <div><span className="k">信用卡與負債</span><Money v={-T.debt} /></div>
+        </div>
       </section>
+
+      <JarsCard />
+      <OwedCard />
 
       <Segmented<Sec>
         value={sec}
@@ -267,7 +278,6 @@ export function AccountEditor({ acc, onClose }: { acc: Account; onClose: () => v
     onClose()
   }
   const remove = () => {
-    if (!window.confirm(`刪除「${a.name}」？既有紀錄會保留，但不再連動此帳戶。`)) return
     deleteAccount(a.id)
     flash('已刪除')
     onClose()

@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import type { StatMode, TxKind } from '../logic'
+import type { ExpDim, StatMode, TxKind } from '../logic'
 import type { GroupKey } from '../types'
 import { GROUP_META, catMeta } from '../types'
 import { useStore } from '../store'
 import { BudgetFull } from '../components/Budget'
-import { monthFlows, monthLabel, rangeStats, netWorthHistory, projectList, shiftMonth, thisMonth, todayStr } from '../logic'
+import { rankBy, monthLabel, rangeStats, netWorthHistory, projectList, shiftMonth, thisMonth, todayStr } from '../logic'
 import { Money, Segmented } from '../components/ui'
-import { Donut, IOChart, TotalOverview, NetWorthChart, RankBars, Sankey, TrendChart } from '../components/charts'
+import { Donut, IOChart, TotalOverview, NetWorthChart, RankBars, TrendChart } from '../components/charts'
 import { IconChevron, IconChevronL } from '../components/icons'
 
 type Unit = 'year' | 'month' | 'week' | 'custom'
@@ -20,6 +20,7 @@ const mondayOf = (d: string) => {
   const wd = new Date(Date.UTC(y, m - 1, dd)).getUTCDay()
   return addDays(d, -((wd + 6) % 7))
 }
+const DIM_LABEL: Record<ExpDim, string> = { cat: '分類', project: '專案', account: '帳戶' }
 const lastDayOf = (m: string) => `${m}-${String(new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`
 
 export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => void }) {
@@ -32,6 +33,7 @@ export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => voi
   const [kind, setKind] = useState<TxKind>('all')
   const [mode, setMode] = useState<StatMode>('spend')
   const [byGroup, setByGroup] = useState<'cat' | 'group'>('cat')
+  const [dim, setDim] = useState<ExpDim>('cat')
   const [cStart, setCStart] = useState(`${shiftMonth(cur, -2)}-01`)
   const [cEnd, setCEnd] = useState(todayStr())
   const year = anchor.slice(0, 4)
@@ -64,13 +66,15 @@ export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => voi
     : unit === 'week' && start === mondayOf(today) ? 'week' : ''
   const month = start.slice(0, 7)
   const R = useMemo(() => rangeStats(state, start, end, mode), [state, start, end, mode])
-  const flows = useMemo(() => monthFlows(state, start, end), [state, start, end])
+  const rankedExp = useMemo(() => rankBy(state, start, end, dim, 'expense'), [state, start, end, dim])
+  const rankedInc = useMemo(() => rankBy(state, start, end, dim, 'income'), [state, start, end, dim])
   const hist = netWorthHistory(state, 6)
   const rangeLabel = unit === 'year' ? `${year} 年` : single ? monthLabel(month) : unit === 'week' ? `週 ${start.slice(5).replace('-', '/')}（一）– ${end.slice(5).replace('-', '/')}（日）` : `${start.replace(/-/g, '/')} – ${end.replace(/-/g, '/')}`
   const showExp = kind === 'all' || kind === 'expense'
   const showInc = kind === 'all' || kind === 'income'
-  const showTr = kind === 'all' || kind === 'transfer'
-  const keys = (kind === 'all' ? ['income', 'expense', 'transfer'] : [kind]) as ('income' | 'expense' | 'transfer')[]
+  const keys = (kind === 'all' ? ['income', 'expense', 'invest'] : kind === 'income' ? ['income'] : ['expense']) as ('income' | 'expense' | 'invest')[]
+  const expData = dim === 'cat' ? { cats: R.expCats, total: R.expense } : rankedExp
+  const incData = dim === 'cat' ? { cats: R.incCats, total: R.income } : rankedInc
 
   return (
     <div className="page">
@@ -109,10 +113,9 @@ export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => voi
             { value: 'all', label: '全部' },
             { value: 'expense', label: '支出' },
             { value: 'income', label: '收入' },
-            { value: 'transfer', label: '轉帳' },
           ]}
         />
-        {kind !== 'income' && kind !== 'transfer' && (
+        {kind !== 'income' && (
           <Segmented<StatMode>
             value={mode}
             onChange={setMode}
@@ -127,41 +130,39 @@ export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => voi
       {kind === 'all' && (
         <section className="card">
           <div className="card-head"><h2>總計</h2><span className="muted small">{rangeLabel}</span></div>
-          <TotalOverview income={R.income} expense={R.expense} transfer={R.transfer} onPick={setKind} />
+          <TotalOverview income={R.income} expense={R.expense} onPick={setKind} />
         </section>
       )}
 
       <section className="card">
-        <div className="card-head"><h2>{rangeLabel}</h2><span className="muted small">{R.days} 天 · {R.nExp + R.nInc + R.nTr} 筆</span></div>
+        <div className="card-head"><h2>{rangeLabel}</h2><span className="muted small">{R.days} 天 · {R.nExp + R.nInc} 筆</span></div>
         <div className="mode-sum">
           {showInc && <div><span className="muted small">收入 · {R.nInc} 筆</span><Money v={R.income} className="strong pos" /></div>}
           {showExp && <div><span className="muted small">{mode === 'spend' ? '支出' : '實際流出'} · {R.nExp} 筆</span><Money v={R.expense} className="strong" /></div>}
           {kind === 'all' && <div><span className="muted small">結餘</span><Money v={R.net} sign className={`strong ${R.net >= 0 ? 'pos' : 'neg'}`} /></div>}
-          {showTr && <div><span className="muted small">轉帳（另計）· {R.nTr} 筆</span><Money v={R.transfer} className={kind === 'transfer' ? 'strong' : ''} /></div>}
+          {kind === 'all' && <div><span className="muted small">{GROUP_META.saving.emoji} 投資入金（儲蓄）</span><Money v={R.invest} className="strong pos" /></div>}
           {showExp && <div><span className="muted small">其中信用卡</span><Money v={R.card} /></div>}
-          {kind === 'all' && <div><span className="muted small">{GROUP_META.saving.emoji} 儲蓄（另計）</span><Money v={R.saving.net} className="strong pos" /></div>}
-          {showExp && R.shared > 0 && <div><span className="muted small">幫朋友代墊（不算支出）</span><Money v={R.shared} /></div>}
         </div>
         <p className="hint">
-          {kind === 'transfer'
-            ? '轉帳只是錢在自己帳戶間移動（含繳卡費、投入證券、收回代墊），不算收入也不算支出。'
-            : mode === 'spend'
-              ? '支出依刷卡／消費日期；分帳只算你自己的份額。轉帳另列，不計入收支。'
-              : '信用卡消費改算在帳單扣款日，現金與銀行支出照日期；分帳只算你自己的份額。'}
+          {mode === 'spend'
+            ? '支出依刷卡／消費日期；分帳只算你自己的份額。帳戶之間的轉帳、還卡費、代墊與領現不計入收支。'
+            : '信用卡消費改算在帳單扣款日，現金與銀行支出照日期；分帳只算你自己的份額。'}
         </p>
       </section>
 
-      <section className="card">
-        <div className="card-head"><h2>趨勢</h2><span className="muted small">{R.byDay ? '按日' : '按月'}</span></div>
-        <TrendChart series={R.series} keys={keys} />
-      </section>
+      {unit === 'year' && (
+        <section className="card">
+          <div className="card-head"><h2>逐月趨勢</h2><span className="muted small">{year} 年 1–12 月</span></div>
+          <TrendChart series={R.series} keys={keys} />
+        </section>
+      )}
 
       {unit === 'year' && (
         <section className="card list-card">
           <div className="card-head pad"><h2>逐月明細</h2><span className="muted small">點月份看細節</span></div>
           <div className="month-table">
-            <div className="mt-row head small muted"><span>月份（NT$）</span>{showInc && <span>收入</span>}{showExp && <span>支出</span>}{kind === 'all' && <span>結餘</span>}{showTr && <span>轉帳</span>}</div>
-            {R.series.filter((r) => r.income || r.expense || r.transfer).map((r) => (
+            <div className="mt-row head small muted"><span>月份（NT$）</span>{showInc && <span>收入</span>}{showExp && <span>支出</span>}{kind === 'all' && <span>結餘</span>}{kind === 'all' && <span>投資入金</span>}</div>
+            {R.series.filter((r) => r.income || r.expense || r.invest).map((r) => (
               <button
                 key={r.key}
                 className="mt-row"
@@ -170,56 +171,68 @@ export function Analytics({ onOpenProject }: { onOpenProject: (p: string) => voi
                 <span>{r.label}</span>
                 {showInc && <Money prefix={false} v={r.income} className="pos" />}
                 {showExp && <Money prefix={false} v={r.expense} />}
-                {kind === 'all' && <Money prefix={false} v={r.income - r.expense} sign className={r.income >= r.expense ? 'pos' : 'neg'} />}
-                {showTr && <Money prefix={false} v={r.transfer} className="muted" />}
+                {kind === 'all' && <Money prefix={false} v={r.income - r.expense} sign className={r.income - r.expense >= 0 ? 'pos' : 'neg'} />}
+                {kind === 'all' && <Money prefix={false} v={r.invest} />}
               </button>
             ))}
           </div>
         </section>
       )}
 
-      <div className="grid-2">
-        {showExp && (
-          <section className="card">
-            <div className="card-head"><h2>{byGroup === 'group' ? '三大類' : '支出分類排行'}</h2><span className="muted small">點選區塊看細節</span></div>
-            <Segmented<'cat' | 'group'>
-              value={byGroup}
-              onChange={setByGroup}
-              options={[
-                { value: 'cat', label: '10 類' },
-                { value: 'group', label: '三大類' },
-              ]}
-            />
-            {byGroup === 'cat'
-              ? <Donut data={R.expCats} total={R.expense} center={single ? '本月支出' : '區間支出'} empty="這段期間沒有支出" />
-              : <GroupView R={R} withSaving={kind === 'all'} center={kind === 'all' ? '支出＋儲蓄' : single ? '本月支出' : '區間支出'} />}
-          </section>
-        )}
-        {showInc && (
-          <section className="card">
-            <div className="card-head"><h2>收入來源排行</h2></div>
-            {kind === 'income'
-              ? <Donut data={R.incCats} total={R.income} center="收入" empty="這段期間沒有收入" />
-              : <RankBars data={R.incCats} color="#34C759" empty="這段期間沒有收入" />}
-          </section>
-        )}
-        {showTr && (
-          <section className="card">
-            <div className="card-head"><h2>轉帳類型</h2><span className="muted small">不計入收支</span></div>
-            <RankBars data={R.trCats} color="#8E8E93" empty="這段期間沒有轉帳" />
-          </section>
-        )}
-        {showTr && (
-          <section className="card">
-            <div className="card-head"><h2>轉出 → 轉入</h2><span className="muted small">依帳戶彙整</span></div>
-            <RankBars data={R.pairs.slice(0, 12).map((p) => ({ key: `${p.from} → ${p.to}`, value: p.amount, sub: `${p.count} 筆` }))} color="#5E5CE6" empty="這段期間沒有轉帳" />
-          </section>
-        )}
-      </div>
-
       <section className="card">
-        <div className="card-head"><h2>{single ? '本月資金流向' : '區間資金流向'}</h2><span className="muted small">點節點聚焦 · 可左右滑動</span></div>
-        <Sankey nodes={flows.nodes} links={flows.links} />
+        <div className="card-head">
+          <h2>分類排行</h2>
+          <span className="muted small">點選區塊看細節</span>
+        </div>
+        <Segmented<ExpDim>
+          value={dim}
+          onChange={setDim}
+          options={[
+            { value: 'cat', label: '類別' },
+            { value: 'project', label: '專案' },
+            { value: 'account', label: '帳戶' },
+          ]}
+        />
+        {kind === 'all' && (
+          <TypeSplit
+            income={incData}
+            expense={expData}
+            R={R}
+            byGroup={byGroup}
+            dim={dim}
+            single={single}
+            withSaving
+            onChooseGroup={setByGroup}
+          />
+        )}
+        {kind !== 'all' && showExp && (
+          <div className="rank-block">
+            <div className="rank-title">
+              <b>支出{dim === 'cat' ? '' : `・${DIM_LABEL[dim]}`}</b>
+              {dim === 'cat' && (
+                <Segmented<'cat' | 'group'>
+                  value={byGroup}
+                  onChange={setByGroup}
+                  options={[
+                    { value: 'cat', label: '10 類' },
+                    { value: 'group', label: '三大類' },
+                  ]}
+                />
+              )}
+            </div>
+            {dim === 'cat' && byGroup === 'group'
+              ? <GroupView R={R} withSaving={false} center={single ? '本月支出' : '區間支出'} />
+              : <Donut data={expData.cats} total={expData.total} center={single ? '本月支出' : '區間支出'} empty="這段期間沒有支出" />}
+          </div>
+        )}
+        {kind !== 'all' && showInc && (
+          <div className="rank-block">
+            <div className="rank-title"><b>收入{dim === 'cat' ? '' : `・${DIM_LABEL[dim]}`}</b></div>
+            {kind === 'income'
+              ? <Donut data={incData.cats} total={incData.total} center="收入" empty="這段期間沒有收入" />
+              : <RankBars data={incData.cats} color="#34C759" empty="這段期間沒有收入" />}
+          </div>
+        )}
       </section>
 
       {single && showExp && <BudgetFull month={month} />}
@@ -320,3 +333,73 @@ function ProjectsCard({ onOpen }: { onOpen: (p: string) => void }) {
   )
 }
 
+
+const TYPE_META: Record<string, { emoji: string; label: string; color: string }> = {
+  income: { emoji: '💰', label: '收入', color: '#34C759' },
+  expense: { emoji: '🧾', label: '支出', color: '#FF9F0A' },
+}
+
+/** 全部模式：收入與支出一個圓環（色塊），點哪一塊再展開該類的明細排行 */
+function TypeSplit({ income, expense, R, byGroup, dim, single, onChooseGroup }: {
+  income: { cats: { key: string; value: number }[]; total: number }
+  expense: { cats: { key: string; value: number }[]; total: number }
+  R: RS; byGroup: 'cat' | 'group'; dim: ExpDim; single: boolean; withSaving: boolean
+  onChooseGroup: (v: 'cat' | 'group') => void
+}) {
+  const [open, setOpen] = useState<'income' | 'expense' | null>(null)
+  /** 專案／帳戶維度直接展開明細，不用再點 */
+  const isOpen = (k: 'income' | 'expense') => dim !== 'cat' || open === k
+  const data = [
+    { key: 'expense', value: expense.total },
+    { key: 'income', value: income.total },
+  ].filter((d) => d.value > 0)
+  const total = expense.total + income.total
+  const label = (k: string) => TYPE_META[k]?.label ?? k
+  return (
+    <>
+      <Donut
+        data={data}
+        total={total}
+        center={single ? '本月收支' : '區間收支'}
+        meta={(k: string) => TYPE_META[k] ?? { emoji: '•', label: k, color: '#8E8E93' }}
+        label={label}
+        empty="這段期間沒有收支"
+      />
+      <div className="grp-drill">
+        {(['expense', 'income'] as const).map((k) => {
+          const d = k === 'expense' ? expense : income
+          const v = d.total
+          return (
+            <div key={k} className="grp-drill-item">
+              <button className={`total-row ${isOpen(k) ? 'on' : ''}`} onClick={() => dim === 'cat' && setOpen(open === k ? null : k)} aria-expanded={isOpen(k)}>
+                <span className="total-row-top">
+                  <span><b>{TYPE_META[k].emoji} {TYPE_META[k].label}</b> - <Money v={v} /></span>
+                  <span className="num muted">{total ? `${Math.round((v / total) * 100)}%` : ''}</span>
+                  {dim === 'cat' && <span className="muted">{open === k ? '▾' : '▸'}</span>}
+                </span>
+                <span className="bar-track"><span className="bar-fill" style={{ width: `${total ? (v / total) * 100 : 0}%`, background: TYPE_META[k].color, display: 'block' }} /></span>
+              </button>
+              {isOpen(k) && (
+                <div className="grp-sub">
+                  {k === 'expense' && dim === 'cat' && (
+                    <Segmented<'cat' | 'group'>
+                      value={byGroup}
+                      onChange={onChooseGroup}
+                      options={[
+                        { value: 'cat', label: '10 類' },
+                        { value: 'group', label: '三大類' },
+                      ]}
+                    />
+                  )}
+                  {k === 'expense' && dim === 'cat' && byGroup === 'group'
+                    ? <GroupView R={R} withSaving={false} center={single ? '本月支出' : '區間支出'} />
+                    : <RankBars data={d.cats} color={TYPE_META[k].color} empty={k === 'expense' ? '這段期間沒有支出' : '這段期間沒有收入'} />}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}

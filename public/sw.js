@@ -1,5 +1,5 @@
 // 簡易離線快取：導覽請求走網路優先，靜態資源走快取優先；/api 一律不快取
-const CACHE = 'morgen-wealth-v2-11241539'
+const CACHE = 'duiwo-shengcai-v1'
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon-192.png'])))
   self.skipWaiting()

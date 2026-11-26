@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import type { Account, Tx } from '../types'
 import { useStore } from '../store'
-import { BudgetMini, GroupCard } from '../components/Budget'
+import { GroupCard } from '../components/Budget'
 import { useState } from 'react'
-import { cashWallet, cashWithdrawn, dueCards, friendsOwed, money, etfInvested, monthLabel, monthStats, thisMonth, totals } from '../logic'
+import { cashWallet, cashWithdrawn, dueCards, money, etfInvested, monthLabel, monthStats, thisMonth, totals } from '../logic'
 import { Money, Progress } from '../components/ui'
-import { TxRow } from '../components/TxRow'
+import { PiggyReminder } from '../components/PiggyReminder'
 import { CollectSheet } from '../components/Collect'
+import { SurplusCard } from '../components/Jars'
 import { IconArrow, IconCheck, IconChevron, IconStar } from '../components/icons'
 
 function findAcc(accs: Account[], id: string, tag?: string) {
@@ -36,7 +37,7 @@ function Route({ from, to }: { from?: Account; to?: Account }) {
   )
 }
 
-export function Overview({ onOpenTx, goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx' | 'assets' | 'analytics') => void }) {
+export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx' | 'assets' | 'analytics') => void }) {
   const { state, runFlow, resetFlow, flash, autopay, hidden } = useStore()
   const T = totals(state)
   const month = thisMonth()
@@ -79,14 +80,17 @@ export function Overview({ onOpenTx, goTab }: { onOpenTx: (t: Tx) => void; goTab
 
   const withdrawn = cashWithdrawn(state, month)
   const etfDone = etfInvested(state, month)
-  const recent = state.txs.slice(0, 5)
   const due = dueCards(state)
   const dueTotal = due.reduce((x, d) => x + (d.card.billed ?? 0), 0)
-  const owed = friendsOwed(state)
   const [collectOpen, setCollectOpen] = useState(false)
+  /** 發薪日流程：未完成時預設展開，全部完成後預設收合 */
+  const [flowOpen, setFlowOpen] = useState<boolean | null>(null)
+  const showFlow = flowOpen ?? doneCount < steps.length
 
   return (
     <div className="page">
+      <PiggyReminder />
+      <SurplusCard />
       {due.length > 0 && (
         <section className="card alert">
           <div className="alert-icon">💳</div>
@@ -137,26 +141,31 @@ export function Overview({ onOpenTx, goTab }: { onOpenTx: (t: Tx) => void; goTab
         </div>
       </section>
 
-      {/* 發薪日資金分流 */}
+      {/* 發薪日資金分流（全部完成後收合） */}
       <section className="card">
-        <div className="card-head">
-          <div>
+        <button className="fold-head" onClick={() => setFlowOpen(!showFlow)} aria-expanded={showFlow}>
+          <span>
             <h2>發薪日資金分流</h2>
-            <p className="muted small">{monthLabel(month)} · 已完成 {doneCount}/{steps.length} 步</p>
-          </div>
-          <button
-            className="btn small ghost"
-            onClick={() => {
-              if (window.confirm('重置本月流程？\n\n會撤銷本月由「執行轉帳」產生的紀錄，並把帳戶餘額還原。')) {
-                resetFlow(true)
-                flash('已重置本月流程')
-              }
-            }}
-          >
-            重置
-          </button>
-        </div>
-        <Progress value={doneCount} max={steps.length} tone="green" />
+            <span className="muted small">{monthLabel(month)} · 已完成 {doneCount}/{steps.length} 步</span>
+          </span>
+          <span className={`chev ${showFlow ? 'open' : ''}`}><IconChevron size={16} /></span>
+        </button>
+        {showFlow && (
+          <>
+            <div className="flow-tools">
+              <button
+                className="btn small ghost"
+                onClick={() => {
+                  if (window.confirm('重置本月流程？\n\n會撤銷本月由「執行轉帳」產生的紀錄，並把帳戶餘額還原。')) {
+                    resetFlow(true)
+                    flash('已重置本月流程')
+                  }
+                }}
+              >
+                重置
+              </button>
+            </div>
+            <Progress value={doneCount} max={steps.length} tone="green" />
 
         <div className="steps">
           <StepNode n={1} title="卡費總池" done={isDone('pool')} desc={<><Route from={salary} to={hub} /> · 5 張卡本期應繳合計</>}>
@@ -243,34 +252,13 @@ export function Overview({ onOpenTx, goTab }: { onOpenTx: (t: Tx) => void; goTab
             </div>
           </StepNode>
         </div>
+          </>
+        )}
       </section>
 
-      <div className="grid-2">
-        {/* 現金控管 */}
         <section className="card">
           <div className="card-head">
-            <h2>本月現金</h2>
-            <span className="muted small">上限 <Money v={cashTarget} /></span>
-          </div>
-          <div className="kv-big">
-            <Money v={withdrawn} className="big" />
-            <span className="muted"> / <Money v={cashTarget} /> 已領</span>
-          </div>
-          <Progress value={withdrawn} max={cashTarget} />
-          <div className="row-split">
-            <span className="muted small">現金錢包目前餘額</span>
-            <Money v={cash?.balance ?? 0} className="strong" />
-          </div>
-          <div className="row-split">
-            <span className="muted small">本月 ETF 投入</span>
-            <span><Money v={etfDone} /> <span className="muted small">/ <Money v={etfTarget} /></span></span>
-          </div>
-        </section>
-
-        {/* 本月收支 */}
-        <section className="card">
-          <div className="card-head">
-            <h2>本月收支</h2>
+            <h2>本月概況</h2>
             <button className="link" onClick={() => goTab('analytics')}>分析 <IconChevron size={14} /></button>
           </div>
           <div className="io">
@@ -278,49 +266,23 @@ export function Overview({ onOpenTx, goTab }: { onOpenTx: (t: Tx) => void; goTab
             <div><span className="muted small">支出</span><Money v={st.expense} className="strong" /></div>
             <div><span className="muted small">結餘</span><Money v={st.net} className={`strong ${st.net < 0 ? 'neg' : ''}`} /></div>
           </div>
+          <div className="month-cash">
+            <div className="row-split">
+              <span className="muted small">本月已領現 <Money v={withdrawn} /> / <Money v={cashTarget} /></span>
+              <span className="muted small">錢包 <Money v={cash?.balance ?? 0} /></span>
+            </div>
+            <Progress value={withdrawn} max={cashTarget} />
+            <div className="row-split">
+              <span className="muted small">本月 ETF 投入</span>
+              <span><Money v={etfDone} /> <span className="muted small">/ <Money v={etfTarget} /></span></span>
+            </div>
+          </div>
         </section>
-      </div>
 
       <GroupCard />
-      <BudgetMini onMore={() => { goTab('analytics'); setTimeout(() => document.getElementById('budget-full')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350) }} />
 
-      <section className="card">
-        <div className="card-head">
-          <div>
-            <h2>待收代墊</h2>
-            <p className="muted small">朋友還錢前算你的應收資產，不算支出</p>
-          </div>
-          <Money v={T.receivable} className="strong" />
-        </div>
-        {owed.length ? (
-          <div className="owed">
-            {owed.map((f) => (
-              <div key={f.friend} className="owed-row">
-                <span className="avatar">{f.friend.slice(0, 1)}</span>
-                <span className="row-main">
-                  <span className="row-title">{f.friend}</span>
-                  <span className="row-sub">{f.items.map((r) => `${r.date.slice(5).replace('-', '/')} ${r.note ?? ''}`).join('、')}</span>
-                </span>
-                <Money v={f.amount} className="strong" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted small">目前沒有待收款。記支出時打開「分帳」，朋友的份額就會出現在這裡。</p>
-        )}
-        <div className="list-actions" style={{ padding: '12px 0 0' }}>
-          <button className="btn small primary" disabled={!owed.length} onClick={() => setCollectOpen(true)}>收回代墊</button>
-        </div>
-      </section>
       {collectOpen && <CollectSheet onClose={() => setCollectOpen(false)} />}
 
-      <section className="card list-card">
-        <div className="card-head pad">
-          <h2>最近記帳</h2>
-          <button className="link" onClick={() => goTab('tx')}>全部 <IconChevron size={14} /></button>
-        </div>
-        {recent.length ? recent.map((t) => <TxRow key={t.id} t={t} onClick={() => onOpenTx(t)} showDate />) : <p className="empty">還沒有任何紀錄，點下方 ＋ 開始記第一筆。</p>}
-      </section>
     </div>
   )
 }

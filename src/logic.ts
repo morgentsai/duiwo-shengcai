@@ -1,4 +1,4 @@
-import type { Account, AppState, BudgetCfg, Grp, EntryMode, EntryPrefs, Holding, InvSnapshot, Receivable, Tx } from './types'
+import type { Account, AppState, BudgetCfg, Grp, EntryMode, EntryPrefs, Holding, InvSnapshot, Receivable, Tx, Recur, RecurFreq } from './types'
 import { migrateCats } from './catmigrate'
 import { DEFAULT_FIXED, DEFAULT_SAVING_TARGET, INCOME_CATEGORIES, QUICK_PICKS, catMeta, expenseCats, isFx } from './types'
 
@@ -312,6 +312,8 @@ export function brokerStats(s: AppState, brokerId?: string) {
   let principal = brokers.reduce((x, b) => x + (b.principalBase ?? 0), 0)
   let dividends = 0
   let realized = 0
+  const realizedBy: Record<string, number> = {}
+  const byYear: Record<string, { realized: number; dividends: number }> = {}
   const monthIn: Record<string, number> = {}
   for (const t of s.txs) {
     if (t.type === 'transfer' && !t.trade) {
@@ -322,8 +324,16 @@ export function brokerStats(s: AppState, brokerId?: string) {
       if (t.fromId && ids.has(t.fromId) && !(t.toId && ids.has(t.toId))) principal -= t.amount
     }
     if (t.trade && ids.has(t.trade.brokerId)) {
-      if (t.trade.kind === 'dividend') dividends += t.amount
-      if (t.trade.kind === 'sell' && t.trade.costAtSell !== undefined) realized += t.trade.shares * (t.trade.price - t.trade.costAtSell) - t.trade.fee
+      const yr = t.date.slice(0, 4)
+      byYear[yr] ??= { realized: 0, dividends: 0 }
+      if (t.trade.kind === 'dividend') { dividends += t.amount; byYear[yr].dividends += t.amount }
+      if (t.trade.kind === 'sell' && t.trade.costAtSell !== undefined) {
+        const pl = t.trade.shares * (t.trade.price - t.trade.costAtSell) - t.trade.fee
+        realized += pl
+        byYear[yr].realized += pl
+        const sk = t.trade.strategy ?? 'none'
+        realizedBy[sk] = (realizedBy[sk] ?? 0) + pl
+      }
     }
   }
   const hs = s.holdings.filter((h) => ids.has(h.brokerId))
@@ -331,7 +341,8 @@ export function brokerStats(s: AppState, brokerId?: string) {
   const cost = hs.reduce((x, h) => x + h.shares * h.cost, 0)
   const cash = brokers.reduce((x, b) => x + b.balance, 0)
   const value = mv + cash
-  return { principal, mv, cost, cash, value, unrealized: mv - cost, gain: value - principal, ret: principal ? value / principal - 1 : 0, dividends, realized, monthIn }
+  const years = Object.entries(byYear).sort((a, b) => b[0].localeCompare(a[0])).map(([year, v]) => ({ year, ...v }))
+  return { principal, mv, cost, cash, value, unrealized: mv - cost, gain: value - principal, ret: principal ? value / principal - 1 : 0, dividends, realized, realizedBy, years, monthIn }
 }
 
 export function upsertSnapshot(s: AppState): InvSnapshot[] {
@@ -463,7 +474,7 @@ export function cashDateOf(t: Tx, accounts: Account[]): string {
 
 export const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000) + 1
 
-export interface Bucket { key: string; label: string; expense: number; income: number; transfer: number }
+export interface Bucket { key: string; label: string; expense: number; income: number; invest: number }
 export interface PairRow { from: string; to: string; amount: number; count: number }
 
 /** 任意區間統計：支出（只算自己的份額，可切刷卡日／扣款日）、收入、轉帳（另計，不算收支） */
@@ -473,13 +484,13 @@ export function rangeStats(s: AppState, start: string, end: string, mode: StatMo
   // 先建立完整的時間軸
   if (byDay) {
     for (let i = 0, d = start; d <= end && i < 400; i++) {
-      buckets.set(d, { key: d, label: `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`, expense: 0, income: 0, transfer: 0 })
+      buckets.set(d, { key: d, label: `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`, expense: 0, income: 0, invest: 0 })
       const [y, m, dd] = d.split('-').map(Number)
       d = new Date(Date.UTC(y, m - 1, dd + 1)).toISOString().slice(0, 10)
     }
   } else {
     for (let m = monthOf(start), i = 0; m <= monthOf(end) && i < 120; m = shiftMonth(m, 1), i++)
-      buckets.set(m, { key: m, label: `${Number(m.slice(5))}月`, expense: 0, income: 0, transfer: 0 })
+      buckets.set(m, { key: m, label: `${Number(m.slice(5))}月`, expense: 0, income: 0, invest: 0 })
   }
   const bucketOf = (d: string) => buckets.get(byDay ? d : monthOf(d))
   const expCat: Record<string, number> = {}
@@ -488,7 +499,7 @@ export function rangeStats(s: AppState, start: string, end: string, mode: StatMo
   const pairs = new Map<string, PairRow>()
   const grpCat: Record<Grp, Record<string, number>> = { fixed: {}, variable: {} }
   const grp: Record<Grp, number> = { fixed: 0, variable: 0 }
-  const tot = { expense: 0, income: 0, transfer: 0, card: 0, shared: 0, nExp: 0, nInc: 0, nTr: 0 }
+  const tot = { expense: 0, income: 0, transfer: 0, invest: 0, card: 0, shared: 0, nExp: 0, nInc: 0, nTr: 0 }
   const name = (id?: string, t?: Tx) => s.accounts.find((a) => a.id === id)?.name ?? (t?.tag === 'collect' ? '朋友還款' : t?.trade ? '持股' : '—')
   for (const t of s.txs) {
     if (t.type === 'expense') {
@@ -520,7 +531,11 @@ export function rangeStats(s: AppState, start: string, end: string, mode: StatMo
         tot.nTr++
         const k = t.trade ? `證券${t.trade.kind === 'buy' ? '買進' : '賣出'}` : t.category ?? '一般轉帳'
         trCat[k] = (trCat[k] ?? 0) + t.amount
-        if (b) b.transfer += t.amount
+        // 投資：入金到證券戶或儲蓄帳戶（非證券交易），不算支出
+        if (!t.trade && isSavingAcc(s.accounts.find((a) => a.id === t.toId)) && !isSavingAcc(s.accounts.find((a) => a.id === t.fromId))) {
+          tot.invest += t.amount
+          if (b) b.invest += t.amount
+        }
         const f = t.trade?.kind === 'sell' ? '持股' : name(t.fromId, t)
         const to = t.trade?.kind === 'buy' ? `持股 ${t.trade.symbol}` : name(t.toId)
         const key = `${f}→${to}`
@@ -781,4 +796,47 @@ export const compact = (n: number) => {
   if (a >= 100000) return `${Math.round(a / 10000)}萬`
   if (a >= 10000) return `${(a / 10000).toFixed(1).replace(/\.0$/, '')}萬`
   return a.toLocaleString('en-US')
+}
+
+/* ---------------- 週期性支出 ---------------- */
+/** 第 k 次發生的日期：週＝每 7 天；月／年＝同一日（月底自動夾到當月最後一天） */
+export function recurOccurrence(start: string, freq: RecurFreq, k: number): string {
+  const [y, m, dd] = start.split('-').map(Number)
+  if (freq === 'week') return new Date(Date.UTC(y, m - 1, dd + 7 * k)).toISOString().slice(0, 10)
+  const mm = freq === 'month' ? m - 1 + k : m - 1
+  const yy = freq === 'year' ? y + k : y
+  const lastDay = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(yy, mm, Math.min(dd, lastDay))).toISOString().slice(0, 10)
+}
+
+/** 截至 today 尚未入帳的發生日（已入帳的 lastRun 之前不再補） */
+export function dueRecurDates(r: Recur, today: string): string[] {
+  const out: string[] = []
+  for (let k = 0; k < 800; k++) {
+    const d = recurOccurrence(r.start, r.freq, k)
+    if (d > today) break
+    if (r.lastRun && d <= r.lastRun) continue
+    out.push(d)
+  }
+  return out
+}
+
+/* ---------------- 分析：依維度排行支出 ---------------- */
+export type ExpDim = 'cat' | 'project' | 'account'
+/** 依維度彙整收入或支出（不含轉帳）；專案、帳戶可同時用於收入與支出 */
+export function rankBy(s: AppState, start: string, end: string, dim: ExpDim, type: 'expense' | 'income') {
+  const acc: Record<string, number> = {}
+  let total = 0
+  for (const t of s.txs) {
+    if (t.type !== type || t.date < start || t.date > end) continue
+    const amt = type === 'expense' ? myAmount(t) : t.amount
+    const accId = type === 'expense' ? t.fromId : t.toId
+    const k =
+      dim === 'cat' ? t.category ?? (type === 'expense' ? '其他' : '其他收入')
+      : dim === 'project' ? t.project?.trim() || '未標專案'
+      : s.accounts.find((a) => a.id === accId)?.name ?? '未知帳戶'
+    acc[k] = (acc[k] ?? 0) + amt
+    total += amt
+  }
+  return { total, cats: Object.entries(acc).map(([key, value]) => ({ key, value })).sort((a, b) => b.value - a.value) }
 }

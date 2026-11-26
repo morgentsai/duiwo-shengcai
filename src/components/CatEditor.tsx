@@ -162,7 +162,7 @@ function CatEdit({ cat, back, onRenamed, run }: { cat: CatDef; back: () => void;
         {!del ? (
           <button className="btn small ghost danger" onClick={() => {
             if (count) return setDel(true)
-            if (window.confirm(`刪除「${cat.key}」？（沒有任何紀錄）`)) { const r = run((s) => deleteCat(s, cat.key)); if (r.ok) back() }
+            { const r = run((s) => deleteCat(s, cat.key)); if (r.ok) back() }
           }}>刪除這個分類</button>
         ) : (
           <div className="del-panel">
@@ -198,7 +198,7 @@ function SubEdit({ cat, sub, count, hidden, run, done }: { cat: CatDef; sub: str
   }
   const doDelete = () => {
     if (!count) {
-      if (window.confirm(`刪除子分類「${sub}」？（沒有任何紀錄）`) && run((s) => deleteSub(s, cat.key, sub)).ok) done()
+      if (run((s) => deleteSub(s, cat.key, sub)).ok) done()
       return
     }
     setDelMode(true)

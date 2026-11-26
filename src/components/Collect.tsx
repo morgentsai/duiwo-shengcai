@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { cashWallet, friendsOwed, money, todayStr } from '../logic'
-import { Sheet } from './ui'
+import { Money, Sheet } from './ui'
 
 /** 收回代墊：選擇待收項目與入帳帳戶，沖銷應收（不算收入） */
 export function CollectSheet({ onClose, friend }: { onClose: () => void; friend?: string }) {
@@ -69,5 +69,46 @@ export function CollectSheet({ onClose, friend }: { onClose: () => void; friend?
       </div>
       <p className="hint">收回代墊只會把「待收」轉成帳戶餘額，不算收入，也不會影響當月餐費。</p>
     </Sheet>
+  )
+}
+
+/** 待收代墊（資產頁）：朋友還錢前算應收資產，不算支出 */
+export function OwedCard() {
+  const { state } = useStore()
+  const owed = friendsOwed(state)
+  const total = owed.reduce((x, f) => x + f.amount, 0)
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <section className="card">
+        <div className="card-head">
+          <div>
+            <h2>待收代墊</h2>
+            <p className="muted small">朋友還錢前算你的應收資產，不算支出</p>
+          </div>
+          <Money v={total} className="strong" />
+        </div>
+        {owed.length ? (
+          <div className="owed">
+            {owed.map((f) => (
+              <div key={f.friend} className="owed-row">
+                <span className="avatar">{f.friend.slice(0, 1)}</span>
+                <span className="row-main">
+                  <span className="row-title">{f.friend}</span>
+                  <span className="row-sub">{f.items.map((r) => `${r.date.slice(5).replace('-', '/')} ${r.note ?? ''}`).join('、')}</span>
+                </span>
+                <Money v={f.amount} className="strong" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted small">目前沒有待收款。記支出時打開「分帳」，朋友的份額就會出現在這裡。</p>
+        )}
+        <div className="list-actions" style={{ padding: '12px 0 0' }}>
+          <button className="btn small primary" disabled={!owed.length} onClick={() => setOpen(true)}>收回代墊</button>
+        </div>
+      </section>
+      {open && <CollectSheet onClose={() => setOpen(false)} />}
+    </>
   )
 }

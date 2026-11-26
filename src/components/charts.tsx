@@ -259,11 +259,11 @@ export function Sankey({ nodes, links }: { nodes: FlowNode[]; links: FlowLink[] 
   )
 }
 
-const SERIES = { income: ['收入', '#34C759'], expense: ['支出', '#FF9F0A'], transfer: ['轉帳', '#8E8E93'] } as const
+const SERIES = { income: ['收入', '#34C759'], expense: ['支出', '#FF9F0A'], invest: ['投資入金', '#5E5CE6'] } as const
 type SKey = keyof typeof SERIES
 
 /** 收支趨勢：依區間長度自動以「日」或「月」為單位的分組長條圖 */
-export function TrendChart({ series, keys }: { series: { key: string; label: string; income: number; expense: number; transfer: number }[]; keys: SKey[] }) {
+export function TrendChart({ series, keys }: { series: { key: string; label: string; income: number; expense: number; invest: number }[]; keys: SKey[] }) {
   const { hidden } = useStore()
   const [hover, setHover] = useState<number | null>(null)
   const n = series.length
@@ -330,16 +330,15 @@ export function RankBars({ data, color, empty }: { data: { key: string; value: n
 
 const TOTAL_TYPES = [
   { key: 'income', label: '收入', color: '#5AC8FA' },
-  { key: 'transfer', label: '轉帳', color: '#FFCC00' },
   { key: 'expense', label: '支出', color: '#FF6B5B' },
 ] as const
 type TotalKey = (typeof TOTAL_TYPES)[number]['key']
 
 /** 「總計」總覽：收入／轉帳／支出 三類佔比圓環 + 收支結餘 + 可點進細看的進度條列 */
-export function TotalOverview({ income, expense, transfer, onPick }: { income: number; expense: number; transfer: number; onPick: (k: TotalKey) => void }) {
+export function TotalOverview({ income, expense, onPick }: { income: number; expense: number; onPick: (k: TotalKey) => void }) {
   const { hidden } = useStore()
-  const vals: Record<TotalKey, number> = { income, expense, transfer }
-  const sum = income + expense + transfer
+  const vals: Record<TotalKey, number> = { income, expense }
+  const sum = income + expense
   const rows = TOTAL_TYPES.map((t) => ({ ...t, value: vals[t.key], share: sum ? vals[t.key] / sum : 0 })).sort((a, b) => b.value - a.value)
   const net = income - expense
   const pctTxt = (r: number) => `${(r * 100).toFixed(2)}%`

@@ -4,7 +4,8 @@ import { INCOME_CATEGORIES, TRANSFER_CATEGORIES, isFx } from '../types'
 import { useStore } from '../store'
 import { budgetAlert, cashWallet, defaultIncomeTo, defaultPayId, defaultSubFor, money, projectList, quickPickOf, resolvePrefs, todayStr } from '../logic'
 import { Segmented, Sheet } from './ui'
-import { IconStar } from './icons'
+import { IconChevron, IconChevronL, IconStar } from './icons'
+import { emitBurst } from './Burst'
 
 type Mode = 'expense' | 'income' | 'transfer' | 'withdraw'
 
@@ -47,7 +48,7 @@ function SubSelect({ def, value, onChange, onAdd }: { def?: CatDef; value: strin
 }
 
 /** 依類型分組的帳戶下拉 */
-export function AccountSelect({ value, onChange, groups, label, placeholder, hidden, inline }: {
+export function AccountSelect({ value, onChange, groups, label, placeholder, hidden: _hidden, inline }: {
   value: string
   onChange: (v: string) => void
   groups: [string, Account[]][]
@@ -58,11 +59,9 @@ export function AccountSelect({ value, onChange, groups, label, placeholder, hid
 }) {
   const all = groups.flatMap(([, l]) => l)
   const inList = all.some((a) => a.id === value)
+  // 記帳時只顯示帳戶名稱，不顯示餘額
   const opt = (a: Account) => (
-    <option key={a.id} value={a.id}>
-      {a.name}
-      {a.kind === 'card' ? `　應繳 ${money((a.billed ?? 0) + (a.unbilled ?? 0), hidden)}` : a.kind === 'broker' || a.kind === 'loan' ? '' : `　${money(a.balance, hidden)}`}
-    </option>
+    <option key={a.id} value={a.id}>{a.name}</option>
   )
   return (
     <label className={inline ? 'inline-field' : 'field'}>
@@ -82,7 +81,7 @@ export function TxEditor({ open, onClose, editing, initialDate }: { open: boolea
 }
 
 function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void; editing?: Tx; initialDate?: string }) {
-  const { state, addTx, updateTx, deleteTx, flash, hidden, expCats: allCats, pickCats: expCats, addCustomCat, addCustomSub, setPrefs } = useStore()
+  const { state, addTx, updateTx, deleteTx, flash, hidden, expCats: allCats, pickCats: expCats, addCustomCat, addCustomSub, setPrefs, addRecur, runRecur } = useStore()
   const P = useMemo(() => resolvePrefs(state), [state])
   const accs = state.accounts
   const cards = accs.filter((a) => a.kind === 'card')
@@ -108,7 +107,18 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
   const [wFrom, setWFrom] = useState(editing?.tag === 'withdraw' ? editing.fromId ?? P.withdrawFrom : P.withdrawFrom)
   const [wTo, setWTo] = useState(editing?.tag === 'withdraw' ? editing.toId ?? P.withdrawTo : P.withdrawTo)
   const [moreCats, setMoreCats] = useState(false)
+  /** 手機輸入友善：分類、其他帳戶、更多（日期／分帳／備註）預設收合 */
+  const [catOpen, setCatOpen] = useState(!!editing)
+  const [otherOpen, setOtherOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(!!editing)
   const [date, setDate] = useState(editing?.date ?? initialDate ?? todayStr())
+  /** 單次或週期性（只對新增的支出有效） */
+  const [freq, setFreq] = useState<'once' | 'week' | 'month' | 'year'>('once')
+  const stepDay = (n: number) => {
+    const [y, m, d] = date.split('-').map(Number)
+    setDate(new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10))
+  }
+  const weekday = ['日', '一', '二', '三', '四', '五', '六'][new Date(`${date}T00:00:00Z`).getUTCDay()]
   const [note, setNote] = useState(editing?.note ?? '')
   // 分帳
   const [splitOn, setSplitOn] = useState(!!editing?.share)
@@ -168,9 +178,18 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
     if (editing) {
       updateTx(editing.id, { ...tx, id: editing.id, flowKey: editing.flowKey, groupId: editing.groupId, groupTitle: editing.groupTitle })
       flash('已更新紀錄')
+    } else if (mode === 'expense' && freq !== 'once') {
+      const { date: _date, ...tpl } = tx as Tx
+      addRecur({ freq, start: date, tpl })
+      runRecur()
+      emitBurst('expense')
+      onClose()
+      flash(`已設定${freq === 'week' ? '每週' : freq === 'month' ? '每月' : '每年'}自動記帳 ${sub || category} ${money(amt, hidden)}`)
+      return
     } else {
       const warn = mode === 'expense' ? budgetAlert(state, { category, sub: sub || undefined, amount: tx.share ? tx.share.mine : amt, date }) : ''
       addTx(tx)
+      emitBurst(mode === 'expense' ? 'expense' : mode === 'income' ? 'income' : 'hope')
       if (mode === 'expense' && P.rememberLastPay && fromId !== P.lastPayId) setPrefs({ lastPayId: fromId })
       if (mode === 'income' && P.rememberLastIncome && toId !== P.lastIncomeTo) setPrefs({ lastIncomeTo: toId })
       flash(mode === 'expense' ? `已記下 ${sub || category} ${money(amt, hidden)}${warn ? `\n${warn}` : ''}` : '已新增紀錄')
@@ -181,7 +200,6 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
   const remove = () => {
     if (!editing) return
     if (lockedShare) return flash('這筆分帳已有朋友還款，請先刪除對應的「收回代墊」紀錄')
-    if (!window.confirm('確定刪除這筆紀錄？相關帳戶與卡費餘額會自動回補。')) return
     deleteTx(editing.id)
     flash('已刪除，餘額已回補')
     onClose()
@@ -283,6 +301,22 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
         />
       </div>
 
+      {mode === 'expense' && !editing && (
+        <>
+          <div className="section-label">次數</div>
+          <Segmented<'once' | 'week' | 'month' | 'year'>
+            value={freq}
+            onChange={setFreq}
+            options={[
+              { value: 'once', label: '單次' },
+              { value: 'week', label: '每週' },
+              { value: 'month', label: '每月' },
+              { value: 'year', label: '每年' },
+            ]}
+          />
+          {freq !== 'once' && <p className="hint">從「日期」那天開始，之後每{freq === 'week' ? '週' : freq === 'month' ? '月' : '年'}同一天自動記一筆；開啟 App 時會補記到今天，可在「設定」刪除規則。</p>}
+        </>
+      )}
       {mode === 'expense' && (
         <>
           {quickPicks.length > 0 && (
@@ -306,44 +340,33 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
           <div className="chip-row pay-row">
             {chipAccs.map((c) => <Chip key={c.id} a={c} on={fromId === c.id} onClick={() => setFromId(c.id)} star={P.favAccounts.includes(c.id)} />)}
           </div>
-          <AccountSelect
-            inline
-            label="其他"
-            value={chipIds.includes(fromId) ? '' : fromId}
-            onChange={(v) => v && setFromId(v)}
-            groups={payGroups}
-            placeholder="其他信用卡／錢包／銀行…"
-            hidden={hidden}
-          />
-          <div className="section-label">分類</div>
-          {catGrid(shownCats, category, setCategory, newCat, true)}
-          <SubSelect def={expCats.find((c) => c.key === category) ?? allCats.find((c) => c.key === category)} value={sub} onChange={setSub} onAdd={newSub} />
-          <label className="toggle-row">
-            <span>🤝 分帳（我先付，朋友之後還）</span>
-            <input type="checkbox" className="switch" checked={splitOn} onChange={(e) => { setSplitOn(e.target.checked); if (e.target.checked && !mine && amt) evenSplit() }} />
-          </label>
-          {splitOn && (
-            <div className="split-box">
-              <div className="split-row">
-                <span className="split-name strong">我的份額</span>
-                <input className="split-amt" inputMode="numeric" value={mine} onChange={(e) => setMine(e.target.value.replace(/\D/g, ''))} placeholder="0" />
-              </div>
-              {parts.map((p, i) => (
-                <div key={i} className="split-row">
-                  <input className="split-name" list="friend-list" placeholder={`朋友 ${i + 1}`} value={p.name} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-                  <input className="split-amt" inputMode="numeric" placeholder="0" value={p.amount} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, amount: e.target.value.replace(/\D/g, '') } : x)))} />
-                  {parts.length > 1 && <button type="button" className="icon-btn" aria-label="移除" onClick={() => setParts(parts.filter((_, j) => j !== i))}>×</button>}
-                </div>
-              ))}
-              <datalist id="friend-list">{friends.map((f) => <option key={f} value={f} />)}</datalist>
-              <div className="split-actions">
-                <button type="button" className="chip small" onClick={() => setParts([...parts, { name: '', amount: '' }])}>＋ 加朋友</button>
-                <button type="button" className="chip small" disabled={!amt} onClick={evenSplit}>平均分攤</button>
-                <span className={`small ${splitDiff ? 'warn' : 'pos'}`}>{splitDiff ? `還差 ${money(splitDiff, hidden)}` : '✓ 金額已平衡'}</span>
-              </div>
-              <p className="hint">付款工具扣總額 {money(amt, hidden)}；只有我的份額算進「{category}」，朋友的部分記成待收代墊（資產），不算支出。</p>
-              {lockedShare && <p className="small warn">已有朋友還款，分帳內容暫時鎖定。</p>}
-            </div>
+          {otherOpen || !chipIds.includes(fromId) ? (
+            <AccountSelect
+              inline
+              label="其他"
+              value={chipIds.includes(fromId) ? '' : fromId}
+              onChange={(v) => v && setFromId(v)}
+              groups={payGroups}
+              placeholder="其他信用卡／錢包／銀行…"
+              hidden={hidden}
+            />
+          ) : (
+            <button type="button" className="row-pick" onClick={() => setOtherOpen(true)}>
+              <span className="muted small">其他帳戶</span>
+              <span className="row-pick-val" />
+              <span className="chev-r">›</span>
+            </button>
+          )}
+          <button type="button" className="row-pick" onClick={() => setCatOpen(!catOpen)} aria-expanded={catOpen}>
+            <span className="muted small">分類</span>
+            <span className="row-pick-val">{`${(expCats.find((c) => c.key === category) ?? allCats.find((c) => c.key === category))?.emoji ?? ''} ${category}${sub ? ` · ${sub}` : ''}`}</span>
+            <span className="chev-r">{catOpen ? '⌃' : '›'}</span>
+          </button>
+          {catOpen && (
+            <>
+              {catGrid(shownCats, category, setCategory, newCat, true)}
+              <SubSelect def={expCats.find((c) => c.key === category) ?? allCats.find((c) => c.key === category)} value={sub} onChange={setSub} onAdd={newSub} />
+            </>
           )}
           <p className="info-line" title={payAcc?.kind === 'card' ? '刷卡：計入該卡未出帳金額與本月支出，等帳單扣款日才從銀行扣。' : '直接扣減該帳戶餘額並計入本月支出。'}>
             ⓘ {payAcc?.kind === 'card' ? `刷 ${payAcc.name}：記入未出帳，不扣銀行` : `直接從 ${payAcc?.name ?? '帳戶'} 扣款`}
@@ -400,21 +423,67 @@ function TxEditorInner({ onClose, editing, initialDate }: { onClose: () => void;
         </>
       )}
 
-      <div className="two-col">
+      {mode === 'expense' && !moreOpen && (
+        <button type="button" className="row-pick" onClick={() => setMoreOpen(true)}>
+          <span className="row-pick-val">更多：日期、分帳、備註</span>
+          <span className="chev-r">›</span>
+        </button>
+      )}
+      {(mode !== 'expense' || moreOpen) && (
+        <>
+          {mode === 'expense' && (
+            <>
+            <label className="toggle-row">
+              <span>🤝 分帳（我先付，朋友之後還）</span>
+              <input type="checkbox" className="switch" checked={splitOn} onChange={(e) => { setSplitOn(e.target.checked); if (e.target.checked && !mine && amt) evenSplit() }} />
+            </label>
+            {splitOn && (
+              <div className="split-box">
+                <div className="split-row">
+                  <span className="split-name strong">我的份額</span>
+                  <input className="split-amt" inputMode="numeric" value={mine} onChange={(e) => setMine(e.target.value.replace(/\D/g, ''))} placeholder="0" />
+                </div>
+                {parts.map((p, i) => (
+                  <div key={i} className="split-row">
+                    <input className="split-name" list="friend-list" placeholder={`朋友 ${i + 1}`} value={p.name} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                    <input className="split-amt" inputMode="numeric" placeholder="0" value={p.amount} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, amount: e.target.value.replace(/\D/g, '') } : x)))} />
+                    {parts.length > 1 && <button type="button" className="icon-btn" aria-label="移除" onClick={() => setParts(parts.filter((_, j) => j !== i))}>×</button>}
+                  </div>
+                ))}
+                <datalist id="friend-list">{friends.map((f) => <option key={f} value={f} />)}</datalist>
+                <div className="split-actions">
+                  <button type="button" className="chip small" onClick={() => setParts([...parts, { name: '', amount: '' }])}>＋ 加朋友</button>
+                  <button type="button" className="chip small" disabled={!amt} onClick={evenSplit}>平均分攤</button>
+                  <span className={`small ${splitDiff ? 'warn' : 'pos'}`}>{splitDiff ? `還差 ${money(splitDiff, hidden)}` : '✓ 金額已平衡'}</span>
+                </div>
+                <p className="hint">付款工具扣總額 {money(amt, hidden)}；只有我的份額算進「{category}」，朋友的部分記成待收代墊（資產），不算支出。</p>
+                {lockedShare && <p className="small warn">已有朋友還款，分帳內容暫時鎖定。</p>}
+              </div>
+            )}
+            </>
+          )}
+        <div className="two-col">
+          <div className="field">
+            <span className="field-label">日期</span>
+            <div className="date-step">
+              <button type="button" className="icon-btn" onClick={() => stepDay(-1)} aria-label="前一天"><IconChevronL size={18} /></button>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <span className="small muted">週{weekday}</span>
+              <button type="button" className="icon-btn" onClick={() => stepDay(1)} aria-label="後一天"><IconChevron size={18} /></button>
+            </div>
+          </div>
+          <label className="field">
+            <span className="field-label">專案標籤（選填）</span>
+            <input list="project-list" placeholder={projects.length ? '輸入或選擇現有標籤' : '例如：2026 花蓮'} value={project} onChange={(e) => setProject(e.target.value)} maxLength={30} />
+            <datalist id="project-list">{projects.map((p) => <option key={p} value={p} />)}</datalist>
+          </label>
+        </div>
         <label className="field">
-          <span className="field-label">日期</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <span className="field-label">備註</span>
+          <input placeholder="例如：蜜粉、朋友生日" value={note} onChange={(e) => setNote(e.target.value)} maxLength={60} />
         </label>
-        <label className="field">
-          <span className="field-label">專案標籤（選填）</span>
-          <input list="project-list" placeholder={projects.length ? '輸入或選擇現有標籤' : '例如：2026 花蓮'} value={project} onChange={(e) => setProject(e.target.value)} maxLength={30} />
-          <datalist id="project-list">{projects.map((p) => <option key={p} value={p} />)}</datalist>
-        </label>
-      </div>
-      <label className="field">
-        <span className="field-label">備註</span>
-        <input placeholder="例如：蜜粉、朋友生日" value={note} onChange={(e) => setNote(e.target.value)} maxLength={60} />
-      </label>
+        </>
+      )}
     </Sheet>
   )
 }
@@ -448,7 +517,6 @@ function TxDetail({ t, onClose }: { t: Tx; onClose: () => void }) {
           className="btn danger ghost grow"
           style={{ width: '100%' }}
           onClick={() => {
-            if (!window.confirm(tr ? '刪除這筆交易？持倉股數、均價與交割現金會自動回補。' : '刪除這筆收回紀錄？對應的待收代墊會恢復。')) return
             deleteTx(t.id)
             flash('已刪除並回補')
             onClose()

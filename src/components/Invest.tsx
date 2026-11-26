@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Account, Tx } from '../types'
 import { useStore } from '../store'
 import { brokerStats, cardStatements, dateLabel, money, pct, todayStr, uid } from '../logic'
+import type { Trade } from '../types'
 import { Field, Money, Segmented, Sheet } from './ui'
 
 type Stats = ReturnType<typeof brokerStats>
@@ -19,6 +20,39 @@ export function InvestStatGrid({ st, compact }: { st: Stats; compact?: boolean }
       </div>
       <div><span className="muted small">累積配息</span><Money v={st.dividends} /></div>
       <div><span className="muted small">總損益（市值−本金）</span><Money v={st.gain} sign className={up ? 'pos' : 'neg'} /></div>
+      {!compact && <RealizedBox st={st} />}
+    </div>
+  )
+}
+
+const STRAT_LABEL: Record<NonNullable<Trade['strategy']> | 'none', string> = { dca: '定期定額（長期）', swing: '波段（短線）', none: '未標記' }
+
+/** 已實現損益：依策略與年度彙整（只計賣出的價差與配息） */
+function RealizedBox({ st }: { st: Stats }) {
+  const { hidden } = useStore()
+  const keys = (['dca', 'swing', 'none'] as const).filter((k) => st.realizedBy[k] !== undefined)
+  return (
+    <div className="realized-box">
+      <div className="realized-h"><span className="muted small">已實現損益（賣出價差）</span><Money v={st.realized} sign className={st.realized >= 0 ? 'pos' : 'neg'} /></div>
+      {keys.length > 0 && (
+        <div className="realized-rows">
+          {keys.map((k) => (
+            <div key={k}><span className="muted small">{STRAT_LABEL[k]}</span><Money v={st.realizedBy[k]} sign className={st.realizedBy[k] >= 0 ? 'pos' : 'neg'} /></div>
+          ))}
+        </div>
+      )}
+      {st.years.length > 0 && (
+        <div className="realized-years">
+          <div className="muted small realized-row-h"><span>年度</span><span>已實現</span><span>配息</span></div>
+          {st.years.map((y) => (
+            <div key={y.year} className="realized-row-h num">
+              <span>{y.year}</span>
+              <span className={y.realized >= 0 ? 'pos' : 'neg'}>{money(y.realized, hidden, { sign: true })}</span>
+              <span>{money(y.dividends, hidden)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -91,6 +125,7 @@ export function TradeSheet({ broker, initial, onClose }: { broker: Account; init
   const [price, setPrice] = useState(holdings[0] ? String(holdings[0].price) : '')
   const [fee, setFee] = useState('')
   const [reinvest, setReinvest] = useState(false)
+  const [strat, setStrat] = useState<'dca' | 'swing'>(broker.monthlyTarget ? 'dca' : 'swing')
   const held = holdings.find((h) => h.symbol === symbol)
 
   const q = Number(shares) || 0
@@ -110,7 +145,7 @@ export function TradeSheet({ broker, initial, onClose }: { broker: Account; init
       type: 'transfer', date, amount: amt, tag: 'trade', category: '證券交易', sub: k === 'buy' ? '買進' : '賣出',
       ...(k === 'buy' ? { fromId: broker.id } : { toId: broker.id }),
       note: `${k === 'buy' ? '買進' : '賣出'} ${sym} ${q.toLocaleString()} 股 @ ${p}`,
-      trade: { kind: k, brokerId: broker.id, symbol: sym, name: nm, shares: q, price: p, fee: feeN },
+      trade: { kind: k, brokerId: broker.id, symbol: sym, name: nm, shares: q, price: p, fee: feeN, strategy: strat },
     }
   }
 
@@ -200,6 +235,18 @@ export function TradeSheet({ broker, initial, onClose }: { broker: Account; init
         </>
       )}
 
+      {(kind === 'buy' || kind === 'sell') && (
+        <div className="strat-row">
+          <Segmented<'dca' | 'swing'>
+            value={strat}
+            onChange={setStrat}
+            options={[
+              { value: 'dca', label: '定期定額' },
+              { value: 'swing', label: '波段' },
+            ]}
+          />
+        </div>
+      )}
       {kind === 'buy' && (
         <>
           <div className="two-col">

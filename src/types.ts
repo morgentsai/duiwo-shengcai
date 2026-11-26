@@ -122,6 +122,13 @@ export interface Recur {
   tpl: Omit<Tx, 'id' | 'date'>
 }
 
+export interface Profile {
+  name?: string
+  emoji?: string
+  /** 縮成 160px 的 JPEG data URL */
+  photo?: string
+}
+
 export interface AppState {
   version: 2
   isDemo: boolean
@@ -152,6 +159,8 @@ export interface AppState {
   jars?: Jar[]
   /** 撲滿異動紀錄（存入為正、取出為負） */
   jarLog?: JarEntry[]
+  /** 個人檔案：顯示名稱與頭像（emoji 或上傳的小圖 data URL） */
+  profile?: Profile
   updatedAt: number
 }
 

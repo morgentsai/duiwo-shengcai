@@ -11,12 +11,13 @@ import { DataCard, DemoCard, SyncCard, TemplateCard } from '../components/Settin
 import { AccountEditor } from './Assets'
 import { CatManager } from '../components/CatEditor'
 import { BankBadge } from '../components/ui'
+import { Avatar, ProfileCard, useProfile } from '../components/Profile'
 import { IconChevron, IconChevronL, IconStar } from '../components/icons'
 
 export const APP_VERSION = '3.2.0'
-export type SettingsSub = 'prefs' | 'budget' | 'accounts' | 'cats' | 'recur' | 'sync' | 'data' | 'demo' | 'about'
+export type SettingsSub = 'profile' | 'prefs' | 'budget' | 'accounts' | 'cats' | 'recur' | 'sync' | 'data' | 'demo' | 'about'
 export const SETTINGS_TITLES: Record<SettingsSub, string> = {
-  prefs: '記帳預設值', budget: '每月花費上限', accounts: '帳戶與信用卡', cats: '分類與子分類', recur: '週期性支出',
+  profile: '個人檔案', prefs: '記帳預設值', budget: '每月花費上限', accounts: '帳戶與信用卡', cats: '分類與子分類', recur: '週期性支出',
   sync: '雲端同步', data: '資料匯入／匯出', demo: '示範資料', about: 'App 資訊',
 }
 const COLORS = ['#0A84FF', '#34C759', '#FF9F0A', '#FF3B30', '#BF5AF2', '#5E5CE6', '#30B0C7', '#A2845E', '#8E8E93']
@@ -41,8 +42,16 @@ export function Settings({ sub, go }: { sub?: SettingsSub; go: (sub?: SettingsSu
   const pay = state.accounts.find((a) => a.id === P.payId)?.name ?? '—'
   const limits = Object.values(state.budgets).filter((v) => v > 0).length
   const cards = state.accounts.filter((a) => a.kind === 'card').length
+  const me = useProfile()
   return (
     <div className="page settings">
+      <div className="set-group">
+        <button className="set-row profile-row" onClick={() => go('profile')}>
+          <Avatar size={44} />
+          <span className="set-title"><b>{me.name}</b><span className="muted tiny">名稱、頭貼</span></span>
+          <IconChevron className="chev" size={16} />
+        </button>
+      </div>
       <div className="set-group-h">記帳</div>
       <div className="set-group">
         <Row icon="✍️" color="#0A84FF" title="記帳預設值" detail={pay} onClick={() => go('prefs')} />
@@ -87,6 +96,7 @@ function SubView({ sub, back }: { sub: SettingsSub; back: () => void }) {
     <div className="page settings">
       <button className="set-back" onClick={back}><IconChevronL size={18} /> 設定</button>
       <h2 className="set-sub-title">{SETTINGS_TITLES[sub]}</h2>
+      {sub === 'profile' && <ProfileCard />}
       {sub === 'prefs' && <EntryPrefsCard standalone />}
       {sub === 'recur' && <RecurSettings />}
       {sub === 'budget' && (

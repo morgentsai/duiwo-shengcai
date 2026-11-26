@@ -7,12 +7,11 @@ import { Assets } from './pages/Assets'
 import { Analytics } from './pages/Analytics'
 import { SETTINGS_TITLES, Settings } from './pages/Settings'
 import type { SettingsSub } from './pages/Settings'
+import { Avatar, useProfile } from './components/Profile'
 import { TxEditor } from './components/TxEditor'
 import { BurstLayer } from './components/Burst'
 import { IconChart, IconEye, IconEyeOff, IconGear, IconHome, IconList, IconPlus, IconWallet } from './components/icons'
 
-/** 目前登入的帳號身分（顯示在上方） */
-const ACCOUNT_NAME = 'Morgen'
 
 type Tab = 'home' | 'tx' | 'assets' | 'analytics' | 'settings'
 const TITLES: Record<Tab, string> = { home: '總覽', tx: '記帳明細', assets: '資產與負債', analytics: '分析', settings: '設定' }
@@ -61,6 +60,7 @@ function Shell() {
     window.scrollTo({ top: 0 })
   }, [tab, sub])
   /** 進設定子頁用 hash（會留下瀏覽紀錄，手機返回手勢可回上一層） */
+  const me = useProfile()
   const goSettings = useCallback((s?: SettingsSub) => { location.hash = `settings${s ? `/${s}` : ''}` }, [])
 
   const openTx = useCallback((t?: Tx, date?: string) => {
@@ -88,7 +88,7 @@ function Shell() {
             <h1>{TITLES[tab]}</h1>
           </div>
           <div className="top-actions">
-            <span className="who" title="目前登入的帳號">🌸 {ACCOUNT_NAME}</span>
+            <button className="who" title="個人檔案" onClick={() => goSettings('profile')}><Avatar size={18} /> {me.name}</button>
             <button className="icon-btn" onClick={() => setHidden(!hidden)} aria-label={hidden ? '顯示金額' : '隱藏金額'} title={hidden ? '顯示金額' : '隱藏金額'}>
               {hidden ? <IconEyeOff /> : <IconEye />}
             </button>

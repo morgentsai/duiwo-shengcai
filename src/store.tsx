@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Account, AppState, BudgetCfg, EntryPrefs, Grp, Holding, JarEntry, Recur, Tx } from './types'
+import type { Account, AppState, BudgetCfg, EntryPrefs, Grp, Holding, JarEntry, Profile, Recur, Tx } from './types'
 import { setCustomCats, visibleCats } from './types'
 import { addCat as addCatOp, addSub as addSubOp, catsOf, deleteCat, deleteSub } from './catops'
 import type { OpResult } from './catops'
@@ -264,6 +264,7 @@ function useStoreValue() {
   const addCustomSub = useCallback((cat: string, sub: string) => { catOp((s) => addSubOp(s, cat, sub)) }, [catOp])
 
   const setPrefs = useCallback((patch: Partial<EntryPrefs>) => commit((s) => ({ ...s, prefs: { ...(s.prefs ?? {}), ...patch } })), [commit])
+  const setProfile = useCallback((patch: Partial<Profile>) => commit((s) => ({ ...s, profile: { ...(s.profile ?? {}), ...patch } })), [commit])
   const setBudgetCfg = useCallback((cfg: BudgetCfg) => commit((s) => ({ ...s, budgetCfg: cfg })), [commit])
   /** 三大類歸屬：v＝undefined 代表改回預設 */
   const setGroup = useCallback((key: string, v?: Grp) => commit((s) => {
@@ -297,8 +298,8 @@ function useStoreValue() {
     [commit],
   )
 
-  const clearDemo = useCallback(() => commit((s) => clearData(s)), [commit])
-  const loadDemo = useCallback(() => commit((s) => ({ ...buildDemo(), ...(s.prefs ? { prefs: s.prefs } : {}) })), [commit])
+  const clearDemo = useCallback(() => commit((s) => ({ ...clearData(s), ...(s.profile ? { profile: s.profile } : {}) })), [commit])
+  const loadDemo = useCallback(() => commit((s) => ({ ...buildDemo(), ...(s.prefs ? { prefs: s.prefs } : {}), ...(s.profile ? { profile: s.profile } : {}) })), [commit])
   const importState = useCallback((s: AppState) => commit(() => adopt(s)), [commit])
 
   // ---------- 撲滿 ----------
@@ -520,7 +521,7 @@ function useStoreValue() {
   return {
     state, hidden, setHidden, toast, flash,
     addTx, updateTx, deleteTx, runFlow, resetFlow,
-    upsertAccount, deleteAccount, cardStatement, upsertHolding, deleteHolding, setBudget, setBudgetCfg, setGroup, setPrefs, addCustomCat, addCustomSub, removeCustomCat, removeCustomSub, expCats, pickCats, catOp, catEdit,
+    upsertAccount, deleteAccount, cardStatement, upsertHolding, deleteHolding, setBudget, setBudgetCfg, setProfile, setGroup, setPrefs, addCustomCat, addCustomSub, removeCustomCat, removeCustomSub, expCats, pickCats, catOp, catEdit,
     clearDemo, loadDemo, importState, importTxs, addTxs, deleteGroup, autopay, collect, addJar, deleteJar, moveJar,
     addRecur, removeRecur, runRecur,
     userEmail, syncStatus, syncError, lastSynced, signIn, signOut, syncNow,

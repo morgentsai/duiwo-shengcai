@@ -37,6 +37,9 @@ function Route({ from, to }: { from?: Account; to?: Account }) {
   )
 }
 
+/** 每月發薪日（幾號）。只有這一天總覽才會顯示「發薪日資金分流」 */
+const PAYDAY = 5
+
 export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx' | 'assets' | 'analytics') => void }) {
   const { state, runFlow, resetFlow, flash, autopay, hidden } = useStore()
   const T = totals(state)
@@ -86,6 +89,7 @@ export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx'
   /** 發薪日流程：未完成時預設展開，全部完成後預設收合 */
   const [flowOpen, setFlowOpen] = useState<boolean | null>(null)
   const showFlow = flowOpen ?? doneCount < steps.length
+  const isPayday = new Date().getDate() === PAYDAY
 
   return (
     <div className="page">
@@ -141,7 +145,8 @@ export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx'
         </div>
       </section>
 
-      {/* 發薪日資金分流（全部完成後收合） */}
+      {/* 發薪日資金分流：只在每月發薪日（PAYDAY 號）顯示 */}
+      {isPayday && (
       <section className="card">
         <button className="fold-head" onClick={() => setFlowOpen(!showFlow)} aria-expanded={showFlow}>
           <span>
@@ -255,6 +260,7 @@ export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx'
           </>
         )}
       </section>
+      )}
 
         <section className="card">
           <div className="card-head">

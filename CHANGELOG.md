@@ -2,6 +2,11 @@
 
 每次推上 GitHub Pages 的更新都記在這裡。時間為台北時間。
 
+## 2026-11-26（修正）
+
+- 修正 iPhone 桌面圖示打開出現 404：App 設定檔（manifest）、離線快取（sw.js）與圖示改用相對路徑，起始頁指向 /duiwo-shengcai/。
+- 離線快取版本號升到 duiwo-shengcai-v2。
+
 ## 2026-11-26
 
 - **14:00**：`2fe5b3a` 補上 `.gitignore`、`.oxlintrc.json`，觸發部署成功。

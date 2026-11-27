@@ -576,6 +576,25 @@ export function groupOf(map: Record<string, Grp> | undefined, cat?: string, sub?
   }
   return m[`${c}|*`] ?? 'variable'
 }
+/** 總覽「本月概況」：固定支出、照顧與分享（變動支出）合計，以及照顧與分享最常出現的分類（依筆數） */
+export function monthCare(s: AppState, month: string, top = 4) {
+  let fixed = 0
+  let care = 0
+  const tags = new Map<string, { label: string; emoji: string; count: number; amount: number }>()
+  for (const t of s.txs) {
+    if (t.type !== 'expense' || monthOf(t.date) !== month) continue
+    const amt = myAmount(t)
+    const cat = t.category ?? '其他'
+    if (groupOf(s.groupMap, cat, t.sub) === 'fixed') { fixed += amt; continue }
+    care += amt
+    const row = tags.get(cat) ?? { label: cat, emoji: catMeta(cat).emoji, count: 0, amount: 0 }
+    row.count++
+    row.amount += amt
+    tags.set(cat, row)
+  }
+  const list = [...tags.values()].sort((a, b) => b.count - a.count || b.amount - a.amount).slice(0, top)
+  return { fixed, care, tags: list }
+}
 export const isSavingAcc = (a?: Account) => !!a && (a.kind === 'broker' || !!a.savings)
 
 /** 區間儲蓄：轉入證券戶（入金）或儲蓄帳戶的錢；從這些帳戶轉出到一般帳戶則扣回。

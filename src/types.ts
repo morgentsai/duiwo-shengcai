@@ -202,7 +202,7 @@ export type Grp = 'fixed' | 'variable'
 export type GroupKey = Grp | 'saving'
 export const GROUP_META: Record<GroupKey, { label: string; short: string; emoji: string; color: string }> = {
   fixed: { label: '固定支出', short: '固定', emoji: '📌', color: '#5E5CE6' },
-  variable: { label: '變動支出', short: '變動', emoji: '🛒', color: '#FF9F0A' },
+  variable: { label: '照顧與分享', short: '照顧', emoji: '🌷', color: '#FF9F0A' },
   saving: { label: '儲蓄', short: '儲蓄', emoji: '🐷', color: '#34C759' },
 }
 /** 預設歸為固定支出的子分類（其餘都是變動支出） */

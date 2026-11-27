@@ -325,3 +325,11 @@ html { background: var(--bg); }
 .profile-card .input { height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: #fff; font-size: 16px; -webkit-appearance: none; appearance: none; }
 .profile-card .input:focus { outline: none; border-color: #D9A441; box-shadow: 0 0 0 3px #F0CF7E55; }
 .profile-card .list-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- 總覽：照顧與分享 ---------- */
+.care { background: linear-gradient(160deg, #fffaf0 0%, #f8ecd6 100%); border: 1px solid #efdfc2; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.care-label { font-size: 13px; color: var(--gold-ink, #6e4f22); }
+.care-num { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--gold-ink, #6e4f22); }
+.care-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.care-tag { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fffdf7; border: 1px solid #efdfc2; color: var(--gold-ink, #6e4f22); }
+.care-fixed { padding: 12px 4px 0; }

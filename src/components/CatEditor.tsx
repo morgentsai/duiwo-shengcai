@@ -119,7 +119,7 @@ function CatEdit({ cat, back, onRenamed, run }: { cat: CatDef; back: () => void;
       <div className="set-group pad">
         <div className="pref">
           <span className="field-label">三大類預設（沒個別設定的子分類跟著這個）</span>
-          <Segmented<Grp> value={g} onChange={(v) => setGroup(`${cat.key}|*`, v)} options={[{ value: 'fixed', label: '固定支出' }, { value: 'variable', label: '變動支出' }]} />
+          <Segmented<Grp> value={g} onChange={(v) => setGroup(`${cat.key}|*`, v)} options={[{ value: 'fixed', label: '固定支出' }, { value: 'variable', label: '照顧與分享' }]} />
         </div>
         <div className="order-row">
           <span>排序</span>

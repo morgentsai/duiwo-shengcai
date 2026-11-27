@@ -3,7 +3,7 @@ import type { Account, Tx } from '../types'
 import { useStore } from '../store'
 import { GroupCard } from '../components/Budget'
 import { useState } from 'react'
-import { cashWallet, cashWithdrawn, dueCards, money, etfInvested, monthLabel, monthStats, thisMonth, totals } from '../logic'
+import { cashWallet, cashWithdrawn, dueCards, money, etfInvested, monthCare, monthLabel, thisMonth, totals } from '../logic'
 import { Money, Progress } from '../components/ui'
 import { PiggyReminder } from '../components/PiggyReminder'
 import { CollectSheet } from '../components/Collect'
@@ -44,7 +44,7 @@ export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx'
   const { state, runFlow, resetFlow, flash, autopay, hidden } = useStore()
   const T = totals(state)
   const month = thisMonth()
-  const st = monthStats(state, month)
+  const care = monthCare(state, month)
   const accs = state.accounts
   const salary = findAcc(accs, 'mega', '薪資帳戶')
   const hub = findAcc(accs, 'richart', '中繼帳戶 A')
@@ -267,10 +267,18 @@ export function Overview({ goTab }: { onOpenTx: (t: Tx) => void; goTab: (t: 'tx'
             <h2>本月概況</h2>
             <button className="link" onClick={() => goTab('analytics')}>分析 <IconChevron size={14} /></button>
           </div>
-          <div className="io">
-            <div><span className="muted small">收入</span><Money v={st.income} className="pos strong" /></div>
-            <div><span className="muted small">支出</span><Money v={st.expense} className="strong" /></div>
-            <div><span className="muted small">結餘</span><Money v={st.net} className={`strong ${st.net < 0 ? 'neg' : ''}`} /></div>
+          <div className="care">
+            <div className="care-label">🌷 這個月，你照顧了自己，也照顧了別人</div>
+            <Money v={care.care} className="care-num" />
+            {care.tags.length > 0 ? (
+              <div className="care-tags">
+                {care.tags.map((t) => <span key={t.label} className="care-tag">{t.emoji} {t.label} × {t.count}</span>)}
+              </div>
+            ) : <div className="muted small">這個月還沒有照顧與分享的紀錄</div>}
+          </div>
+          <div className="row-split care-fixed">
+            <span className="muted small">📌 固定支出</span>
+            <Money v={care.fixed} className="muted small" />
           </div>
           <div className="month-cash">
             <div className="row-split">

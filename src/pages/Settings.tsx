@@ -14,7 +14,7 @@ import { BankBadge } from '../components/ui'
 import { Avatar, ProfileCard, useProfile } from '../components/Profile'
 import { IconChevron, IconChevronL, IconStar } from '../components/icons'
 
-export const APP_VERSION = '3.3.0'
+export const APP_VERSION = '3.4.0'
 export type SettingsSub = 'profile' | 'prefs' | 'budget' | 'accounts' | 'cats' | 'recur' | 'sync' | 'data' | 'demo' | 'about'
 export const SETTINGS_TITLES: Record<SettingsSub, string> = {
   profile: '個人檔案', prefs: '記帳預設值', budget: '每月花費上限', accounts: '帳戶與信用卡', cats: '分類與子分類', recur: '週期性支出',

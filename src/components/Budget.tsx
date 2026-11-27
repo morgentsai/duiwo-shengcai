@@ -112,7 +112,7 @@ export function GroupCard() {
         <a className="link" href="#settings/budget">設定 ›</a>
       </div>
       <GroupRows st={st} />
-      {noBudget && <p className="muted tiny">固定／變動支出還沒設預算，<a href="#settings/budget" className="link">到「設定 → 每月花費上限」</a>依收入分配。</p>}
+      {noBudget && <p className="muted tiny">固定支出／照顧與分享還沒設預算，<a href="#settings/budget" className="link">到「設定 → 每月花費上限」</a>依收入分配。</p>}
     </section>
   )
 }
@@ -144,7 +144,7 @@ function GroupBudgetSettings() {
   return (
     <div className="grp-set">
       <h3 className="pref-h">三大類預算（每月）</h3>
-      <p className="muted tiny">和下面的分類上限各自獨立。固定／變動支出：綠＜80%、黃 80–100%、紅＝超支；儲蓄越多越好。</p>
+      <p className="muted tiny">和下面的分類上限各自獨立。固定支出／照顧與分享：綠＜80%、黃 80–100%、紅＝超支；儲蓄越多越好。</p>
       {rows.map(({ k, hint }) => (
         <div key={k} className="grp-in">
           <label className="limit-row">
